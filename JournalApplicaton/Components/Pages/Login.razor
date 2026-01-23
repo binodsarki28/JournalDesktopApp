@@ -1,26 +1,80 @@
 @page "/login"
 
-<div class="container d-flex justify-content-center align-items-center vh-100">
-    <div class="card shadow p-4" style="width: 400px;">
-        <h3 class="text-center mb-4">Login</h3>
+@using JournalApplicaton.Model
+@using JournalApplicaton.Services
+@using Microsoft.AspNetCore.Components.Forms
 
-        <div class="mb-3">
-            <label class="form-label">Username</label>
-            <input type="text" class="form-control" placeholder="Enter username">
+@inject IUserService UserService
+@inject NavigationManager Navigation
+
+<EditForm Model="loginModel" OnValidSubmit="LoginUser">
+    <DataAnnotationsValidator />
+    <ValidationSummary />
+
+    <div class="container d-flex justify-content-center align-items-center vh-100">
+        <div class="card shadow p-4" style="width: 400px;">
+            <h3 class="text-center mb-4">Login</h3>
+
+            @if (!string.IsNullOrEmpty(message))
+            {
+                <div class="alert alert-@messageType" role="alert">
+                    @message
+                </div>
+            }
+
+            <div class="mb-3">
+                <label class="form-label">Username</label>
+                <InputText class="form-control" @bind-Value="loginModel.Username" />
+                <ValidationMessage For="@(() => loginModel.Username)" />
+            </div>
+
+            <div class="mb-3">
+                <label class="form-label">Password</label>
+                <InputText type="password" class="form-control" @bind-Value="loginModel.Password" />
+                <ValidationMessage For="@(() => loginModel.Password)" />
+            </div>
+
+            <button class="btn btn-primary w-100" type="submit" disabled="@isSubmitting">
+                @(isSubmitting ? "Logging in..." : "Login")
+            </button>
+
+            <p class="text-center mt-3 mb-0">
+                Don't have an account? <a href="/register">Register</a>
+            </p>
         </div>
-
-        <div class="mb-3">
-            <label class="form-label">Password / PIN</label>
-            <input type="password" class="form-control" placeholder="Enter password">
-        </div>
-
-        <button class="btn btn-primary w-100 mb-3">
-            Login
-        </button>
-
-        <p class="text-center mb-0">
-            Don't have an account?
-            <a href="/register">Register</a>
-        </p>
     </div>
-</div>
+</EditForm>
+
+@code {
+    private LoginViewModel loginModel = new(); // Use LoginViewModel
+    private string message = "";
+    private string messageType = "danger";
+    private bool isSubmitting = false;
+
+    private async Task LoginUser()
+    {
+        if (isSubmitting) return;
+
+        isSubmitting = true;
+
+        var result = await UserService.LoginUserAsync(loginModel.Username, loginModel.Password);
+
+        if (result.Success)
+        {
+            message = "Login successful! Redirecting...";
+            messageType = "success";
+
+            await Task.Delay(1000); // show message for 1s
+            Navigation.NavigateTo("/"); // redirect to home page
+        }
+        else
+        {
+            message = result.ErrorMessage;
+            messageType = "danger";
+        }
+
+        isSubmitting = false;
+    }
+}
+
+}

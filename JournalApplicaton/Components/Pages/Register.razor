@@ -1,31 +1,89 @@
 @page "/register"
 
-<div class="container d-flex justify-content-center align-items-center vh-100">
-    <div class="card shadow p-4" style="width: 420px;">
-        <h3 class="text-center mb-4">Register</h3>
+@using JournalApplicaton.Model
+@using JournalApplicaton.Services
+@using Microsoft.AspNetCore.Components.Forms
 
-        <div class="mb-3">
-            <label class="form-label">Username</label>
-            <input type="text" class="form-control" placeholder="Choose username">
+@inject IUserService UserService
+@inject NavigationManager Navigation
+
+<EditForm Model="userModel" OnValidSubmit="RegisterUser">
+    <DataAnnotationsValidator />
+    <ValidationSummary />
+
+    <div class="container d-flex justify-content-center align-items-center vh-100">
+        <div class="card shadow p-4" style="width: 420px;">
+            <h3 class="text-center mb-4">Register</h3>
+
+            <div class="mb-3">
+                <label>Full Name</label>
+                <InputText class="form-control" @bind-Value="userModel.Name" />
+                <ValidationMessage For="@(() => userModel.Name)" />
+            </div>
+
+            <div class="mb-3">
+                <label>Username</label>
+                <InputText class="form-control" @bind-Value="userModel.Username" />
+                <ValidationMessage For="@(() => userModel.Username)" />
+            </div>
+
+            <div class="mb-3">
+                <label>Email</label>
+                <InputText class="form-control" @bind-Value="userModel.Email" />
+                <ValidationMessage For="@(() => userModel.Email)" />
+            </div>
+
+            <div class="mb-3">
+                <label>Password</label>
+                <InputText type="password" class="form-control"
+                           @bind-Value="userModel.Password" />
+                <ValidationMessage For="@(() => userModel.Password)" />
+            </div>
+
+            <div class="mb-3">
+                <label>Confirm Password</label>
+                <InputText type="password" class="form-control"
+                           @bind-Value="userModel.ConfirmPassword" />
+                <ValidationMessage For="@(() => userModel.ConfirmPassword)" />
+            </div>
+
+            @if (!string.IsNullOrEmpty(message))
+            {
+                <div class="alert alert-@messageType" role="alert">
+                    @message
+                </div>
+            }
+
+            <button class="btn btn-success w-100" type="submit">
+                Register
+            </button>
         </div>
-
-        <div class="mb-3">
-            <label class="form-label">Password / PIN</label>
-            <input type="password" class="form-control" placeholder="Create password">
-        </div>
-
-        <div class="mb-3">
-            <label class="form-label">Confirm Password</label>
-            <input type="password" class="form-control" placeholder="Confirm password">
-        </div>
-
-        <button class="btn btn-success w-100 mb-3">
-            Register
-        </button>
-
-        <p class="text-center mb-0">
-            Already have an account?
-            <a href="/login">Login</a>
-        </p>
     </div>
-</div>
+</EditForm>
+
+@code {
+    private UserViewModel userModel = new();
+    private string message;  // ? Add this
+    private string messageType; // "success" or "danger"
+
+    private async Task RegisterUser()
+    {
+        var result = await UserService.RegisterUserAsync(userModel);
+
+        if (result.Success)
+        {
+            message = "Registration successful! Redirecting to login...";
+            messageType = "success";
+
+            // small delay so user can see the message
+            await Task.Delay(1500);
+            Navigation.NavigateTo("/login");
+        }
+        else
+        {
+            message = result.ErrorMessage;
+            messageType = "danger";
+        }
+    }
+}
+
