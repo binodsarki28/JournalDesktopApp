@@ -1,4 +1,6 @@
-﻿using Microsoft.Extensions.Logging;
+﻿using JournalApplicaton.Data;
+using JournalApplicaton.Services;
+using Microsoft.Extensions.Logging;
 
 namespace JournalApplicaton
 {
@@ -19,6 +21,16 @@ namespace JournalApplicaton
 #if DEBUG
     		builder.Services.AddBlazorWebViewDeveloperTools();
     		builder.Logging.AddDebug();
+
+            builder.Services.AddScoped<IUserService, UserService>();
+            builder.Services.AddDbContext<AppDbContext>();
+
+            var app = builder.Build();
+
+            using var scope = app.Services.CreateScope();
+            var db = scope.ServiceProvider.GetRequiredService<AppDbContext>();
+            db.Database.EnsureCreated();
+
 #endif
 
             return builder.Build();
