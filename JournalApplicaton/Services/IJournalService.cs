@@ -14,5 +14,7 @@ public interface IJournalService
 
     Task<bool> DeleteJournalAsync(int userId, int journalId);
 
+    Task<bool> HasJournalForTodayAsync(int userId);
+
 }
 

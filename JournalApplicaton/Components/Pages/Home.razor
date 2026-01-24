@@ -6,14 +6,12 @@
 @inject IJournalService JournalService
 
 <div class="container py-4">
-
     @if (!Session.IsLoggedIn)
     {
         <div class="text-center py-5">
             <h2>Welcome to the Journal Entry App</h2>
             <p class="text-muted">
                 Capture your daily thoughts, moods, and tags.
-                Track progress, analyze patterns, and export your journey.
             </p>
             <a class="btn btn-primary me-2" href="/login">Login</a>
             <a class="btn btn-outline-primary" href="/register">Register</a>
@@ -21,7 +19,7 @@
     }
     else
     {
-        <!-- ================= HEADER ================= -->
+        <!-- HEADER -->
         <div class="d-flex justify-content-between align-items-center mb-4 p-3 bg-primary text-white rounded">
             <div>
                 <h5>@GetGreeting(), <strong>@Session.CurrentUser!.Name</strong></h5>
@@ -30,45 +28,14 @@
             <button class="btn btn-light" @onclick="Logout">Logout</button>
         </div>
 
-        <!-- ================= ANALYTICS UI ================= -->
-        <div class="mb-4 p-3 bg-light rounded shadow-sm">
-            <h5>Analytics</h5>
-            <div class="row text-center">
-                <div class="col-md-3">
-                    <div class="p-2 border rounded">
-                        <strong>Current Streak</strong>
-                        <p class="mb-0">--</p>
-                    </div>
-                </div>
-                <div class="col-md-3">
-                    <div class="p-2 border rounded">
-                        <strong>Highest Streak</strong>
-                        <p class="mb-0">--</p>
-                    </div>
-                </div>
-                <div class="col-md-3">
-                    <div class="p-2 border rounded">
-                        <strong>This Month Entries</strong>
-                        <p class="mb-0">--</p>
-                    </div>
-                </div>
-                <div class="col-md-3">
-                    <div class="p-2 border rounded">
-                        <strong>Avg Words/Entry</strong>
-                        <p class="mb-0">--</p>
-                    </div>
-                </div>
-            </div>
-        </div>
-
-        <!-- ================= CALENDAR NAV ================= -->
+        <!-- CALENDAR NAV -->
         <div class="d-flex justify-content-between align-items-center mb-2">
             <button class="btn btn-outline-primary" @onclick="PrevMonth">&lt; Prev</button>
             <h4>@currentMonth.ToString("MMMM yyyy")</h4>
             <button class="btn btn-outline-primary" @onclick="NextMonth">Next &gt;</button>
         </div>
 
-        <!-- ================= CALENDAR ================= -->
+        <!-- CALENDAR -->
         <table class="table table-bordered text-center">
             <thead class="table-light">
                 <tr>
@@ -114,7 +81,6 @@
                                         }
                                     </div>
 
-                                    @* Preload journal tick asynchronously only if not loaded *@
                                     @if (!dateHasJournal.ContainsKey(date))
                                     {
                                         _ = CheckDateHasJournal(date);
@@ -127,18 +93,14 @@
             </tbody>
         </table>
 
-        <!-- ================= JOURNAL MODAL ================= -->
+        <!-- JOURNAL MODAL -->
         @if (showJournalModal)
         {
-            <div class="modal fade show d-block"
-                 tabindex="-1"
-                 style="background:rgba(0,0,0,0.6);">
+            <div class="modal fade show d-block" tabindex="-1" style="background:rgba(0,0,0,0.6);">
                 <div class="modal-dialog modal-lg">
                     <div class="modal-content">
                         <div class="modal-header">
-                            <h5 class="modal-title">
-                                Journal – @selectedDate.ToShortDateString()
-                            </h5>
+                            <h5 class="modal-title">Journal – @selectedDate.ToShortDateString()</h5>
                             <button class="btn-close" @onclick="CloseModal"></button>
                         </div>
 
@@ -170,17 +132,13 @@
 
                             @if (!string.IsNullOrEmpty(formMessage))
                             {
-                                <div class="alert alert-@formMessageType">
-                                    @formMessage
-                                </div>
+                                <div class="alert alert-@formMessageType">@formMessage</div>
                             }
                         </div>
 
                         <div class="modal-footer">
                             <button class="btn btn-secondary" @onclick="CloseModal">Cancel</button>
-                            <button class="btn btn-success" @onclick="SaveJournal">
-                                Save Journal
-                            </button>
+                            <button class="btn btn-success" @onclick="SaveJournal">Save Journal</button>
                         </div>
                     </div>
                 </div>
@@ -190,10 +148,8 @@
 </div>
 
 @code {
-
     private DateTime currentMonth = DateTime.Today;
     private DateTime selectedDate;
-
     private bool showJournalModal = false;
 
     private string journalTitle = "";
@@ -207,14 +163,12 @@
 
     private Dictionary<DateTime, bool> dateHasJournal = new();
 
-    /* ---------------- AUTH ---------------- */
     private void Logout()
     {
         Session.Logout();
         Navigation.NavigateTo("/login", true);
     }
 
-    /* ---------------- CALENDAR ---------------- */
     private void PrevMonth() => currentMonth = currentMonth.AddMonths(-1);
     private void NextMonth() => currentMonth = currentMonth.AddMonths(1);
 
@@ -228,27 +182,13 @@
     private async void SelectDate(DateTime date)
     {
         selectedDate = date;
+        var journal = await JournalService.GetJournalByDateAsync(Session.CurrentUser!.UserId, date);
 
-        var existingJournal = await JournalService.GetJournalByDateAsync(Session.CurrentUser!.UserId, date);
-
-        if (existingJournal != null)
-        {
-            journalTitle = existingJournal.Title;
-            journalContent = existingJournal.Content;
-            journalPrimaryMood = existingJournal.PrimaryMood;
-            journalSecondaryMoods = string.Join(",",
-                new[] { existingJournal.SecondaryMood1, existingJournal.SecondaryMood2 }
-                .Where(x => !string.IsNullOrWhiteSpace(x)));
-            journalTags = existingJournal.Tags;
-        }
-        else
-        {
-            journalTitle = "";
-            journalContent = "";
-            journalPrimaryMood = "";
-            journalSecondaryMoods = "";
-            journalTags = "";
-        }
+        journalTitle = journal?.Title ?? "";
+        journalContent = journal?.Content ?? "";
+        journalPrimaryMood = journal?.PrimaryMood ?? "";
+        journalSecondaryMoods = string.Join(",", new[] { journal?.SecondaryMood1, journal?.SecondaryMood2 }.Where(x => !string.IsNullOrWhiteSpace(x)));
+        journalTags = journal?.Tags ?? "";
 
         formMessage = "";
         showJournalModal = true;
@@ -260,19 +200,16 @@
         formMessage = "";
     }
 
-    /* ---------------- SAVE ---------------- */
     private async Task SaveJournal()
     {
-        if (string.IsNullOrWhiteSpace(journalTitle) ||
-            string.IsNullOrWhiteSpace(journalContent))
+        if (string.IsNullOrWhiteSpace(journalTitle) || string.IsNullOrWhiteSpace(journalContent))
         {
             formMessage = "Title and content are required.";
             formMessageType = "danger";
             return;
         }
 
-        var moods = journalSecondaryMoods?
-            .Split(',', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries);
+        var moods = journalSecondaryMoods?.Split(',', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries);
 
         var model = new JournalViewModel
         {
@@ -285,10 +222,7 @@
             Tags = journalTags
         };
 
-        var result = await JournalService.AddOrUpdateJournalAsync(
-            Session.CurrentUser!.UserId,
-            model
-        );
+        var result = await JournalService.AddOrUpdateJournalAsync(Session.CurrentUser!.UserId, model);
 
         if (!result.Success)
         {
@@ -297,15 +231,11 @@
             return;
         }
 
-        // Mark date as having journal
         dateHasJournal[selectedDate] = true;
-
-        await Task.Delay(700);
-        showJournalModal = false;
         StateHasChanged();
+        CloseModal();
     }
 
-    /* ---------------- HELPERS ---------------- */
     private string GetGreeting()
     {
         var hour = DateTime.Now.Hour;

@@ -128,4 +128,10 @@ public class JournalService : IJournalService
         return true;
     }
 
+    public async Task<bool> HasJournalForTodayAsync(int userId)
+    {
+        return await _context.Journals.AnyAsync(j =>
+            j.UserId == userId &&
+            j.EntryDate.Date == DateTime.Today);
+    }
 }
