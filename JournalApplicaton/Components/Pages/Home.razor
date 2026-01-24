@@ -1,3 +1,315 @@
 ﻿@page "/"
+@using JournalApplicaton.Model
+@using JournalApplicaton.Services
+@inject UserSessionService Session
+@inject NavigationManager Navigation
+@inject IJournalService JournalService
 
-<h1>Welcome to the Jouranl Application</h1>
+<div class="container py-4">
+
+    @if (!Session.IsLoggedIn)
+    {
+        <div class="text-center py-5">
+            <h2>Welcome to the Journal Entry App</h2>
+            <p class="text-muted">
+                Capture your daily thoughts, moods, and tags.
+                Track progress, analyze patterns, and export your journey.
+            </p>
+            <a class="btn btn-primary me-2" href="/login">Login</a>
+            <a class="btn btn-outline-primary" href="/register">Register</a>
+        </div>
+    }
+    else
+    {
+        <!-- ================= HEADER ================= -->
+        <div class="d-flex justify-content-between align-items-center mb-4 p-3 bg-primary text-white rounded">
+            <div>
+                <h5>@GetGreeting(), <strong>@Session.CurrentUser!.Name</strong></h5>
+                <small>@Session.CurrentUser!.Email</small>
+            </div>
+            <button class="btn btn-light" @onclick="Logout">Logout</button>
+        </div>
+
+        <!-- ================= ANALYTICS UI ================= -->
+        <div class="mb-4 p-3 bg-light rounded shadow-sm">
+            <h5>Analytics</h5>
+            <div class="row text-center">
+                <div class="col-md-3">
+                    <div class="p-2 border rounded">
+                        <strong>Current Streak</strong>
+                        <p class="mb-0">--</p>
+                    </div>
+                </div>
+                <div class="col-md-3">
+                    <div class="p-2 border rounded">
+                        <strong>Highest Streak</strong>
+                        <p class="mb-0">--</p>
+                    </div>
+                </div>
+                <div class="col-md-3">
+                    <div class="p-2 border rounded">
+                        <strong>This Month Entries</strong>
+                        <p class="mb-0">--</p>
+                    </div>
+                </div>
+                <div class="col-md-3">
+                    <div class="p-2 border rounded">
+                        <strong>Avg Words/Entry</strong>
+                        <p class="mb-0">--</p>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- ================= CALENDAR NAV ================= -->
+        <div class="d-flex justify-content-between align-items-center mb-2">
+            <button class="btn btn-outline-primary" @onclick="PrevMonth">&lt; Prev</button>
+            <h4>@currentMonth.ToString("MMMM yyyy")</h4>
+            <button class="btn btn-outline-primary" @onclick="NextMonth">Next &gt;</button>
+        </div>
+
+        <!-- ================= CALENDAR ================= -->
+        <table class="table table-bordered text-center">
+            <thead class="table-light">
+                <tr>
+                    @foreach (var day in Enum.GetValues<DayOfWeek>())
+                    {
+                        <th class="@((day == DayOfWeek.Saturday || day == DayOfWeek.Sunday) ? "text-danger" : "")">
+                            @day.ToString().Substring(0, 3)
+                        </th>
+                    }
+                </tr>
+            </thead>
+            <tbody>
+                @for (int r = 0; r < 6; r++)
+                {
+                    <tr>
+                        @for (int c = 0; c < 7; c++)
+                        {
+                            int cellIndex = r * 7 + c;
+                            var firstDay = new DateTime(currentMonth.Year, currentMonth.Month, 1);
+                            int blanks = (int)firstDay.DayOfWeek;
+                            int daysInMonth = DateTime.DaysInMonth(currentMonth.Year, currentMonth.Month);
+                            int dayCounter = cellIndex - blanks + 1;
+
+                            if (cellIndex < blanks || dayCounter > daysInMonth)
+                            {
+                                <td></td>
+                            }
+                            else
+                            {
+                                var date = new DateTime(currentMonth.Year, currentMonth.Month, dayCounter);
+                                bool isToday = date == DateTime.Today;
+                                bool isFuture = date > DateTime.Today;
+                                bool hasJournal = dateHasJournal.ContainsKey(date) && dateHasJournal[date];
+
+                                <td style="height:80px; cursor:@(isFuture ? "not-allowed" : "pointer"); opacity:@(isFuture ? 0.5 : 1); position:relative"
+                                    @onclick="@(isFuture ? null : (() => SelectDate(date)))">
+
+                                    <div class="@(isToday ? "bg-primary text-white rounded-circle px-2 d-inline-block" : "")">
+                                        @dayCounter
+                                        @if (hasJournal)
+                                        {
+                                            <span class="position-absolute top-0 end-0 text-success" style="font-size:14px;">✔</span>
+                                        }
+                                    </div>
+
+                                    @* Preload journal tick asynchronously only if not loaded *@
+                                    @if (!dateHasJournal.ContainsKey(date))
+                                    {
+                                        _ = CheckDateHasJournal(date);
+                                    }
+                                </td>
+                            }
+                        }
+                    </tr>
+                }
+            </tbody>
+        </table>
+
+        <!-- ================= JOURNAL MODAL ================= -->
+        @if (showJournalModal)
+        {
+            <div class="modal fade show d-block"
+                 tabindex="-1"
+                 style="background:rgba(0,0,0,0.6);">
+                <div class="modal-dialog modal-lg">
+                    <div class="modal-content">
+                        <div class="modal-header">
+                            <h5 class="modal-title">
+                                Journal – @selectedDate.ToShortDateString()
+                            </h5>
+                            <button class="btn-close" @onclick="CloseModal"></button>
+                        </div>
+
+                        <div class="modal-body">
+                            <div class="mb-3">
+                                <label class="form-label">Title</label>
+                                <input class="form-control" @bind="journalTitle" />
+                            </div>
+
+                            <div class="mb-3">
+                                <label class="form-label">Content</label>
+                                <textarea class="form-control" rows="6" @bind="journalContent"></textarea>
+                            </div>
+
+                            <div class="mb-3">
+                                <label class="form-label">Primary Mood</label>
+                                <input class="form-control" @bind="journalPrimaryMood" />
+                            </div>
+
+                            <div class="mb-3">
+                                <label class="form-label">Secondary Moods (comma separated)</label>
+                                <input class="form-control" @bind="journalSecondaryMoods" />
+                            </div>
+
+                            <div class="mb-3">
+                                <label class="form-label">Tags</label>
+                                <input class="form-control" @bind="journalTags" />
+                            </div>
+
+                            @if (!string.IsNullOrEmpty(formMessage))
+                            {
+                                <div class="alert alert-@formMessageType">
+                                    @formMessage
+                                </div>
+                            }
+                        </div>
+
+                        <div class="modal-footer">
+                            <button class="btn btn-secondary" @onclick="CloseModal">Cancel</button>
+                            <button class="btn btn-success" @onclick="SaveJournal">
+                                Save Journal
+                            </button>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        }
+    }
+</div>
+
+@code {
+
+    private DateTime currentMonth = DateTime.Today;
+    private DateTime selectedDate;
+
+    private bool showJournalModal = false;
+
+    private string journalTitle = "";
+    private string journalContent = "";
+    private string journalPrimaryMood = "";
+    private string journalSecondaryMoods = "";
+    private string journalTags = "";
+
+    private string formMessage = "";
+    private string formMessageType = "danger";
+
+    private Dictionary<DateTime, bool> dateHasJournal = new();
+
+    /* ---------------- AUTH ---------------- */
+    private void Logout()
+    {
+        Session.Logout();
+        Navigation.NavigateTo("/login", true);
+    }
+
+    /* ---------------- CALENDAR ---------------- */
+    private void PrevMonth() => currentMonth = currentMonth.AddMonths(-1);
+    private void NextMonth() => currentMonth = currentMonth.AddMonths(1);
+
+    private async Task CheckDateHasJournal(DateTime date)
+    {
+        var journal = await JournalService.GetJournalByDateAsync(Session.CurrentUser!.UserId, date);
+        dateHasJournal[date] = journal != null;
+        StateHasChanged();
+    }
+
+    private async void SelectDate(DateTime date)
+    {
+        selectedDate = date;
+
+        var existingJournal = await JournalService.GetJournalByDateAsync(Session.CurrentUser!.UserId, date);
+
+        if (existingJournal != null)
+        {
+            journalTitle = existingJournal.Title;
+            journalContent = existingJournal.Content;
+            journalPrimaryMood = existingJournal.PrimaryMood;
+            journalSecondaryMoods = string.Join(",",
+                new[] { existingJournal.SecondaryMood1, existingJournal.SecondaryMood2 }
+                .Where(x => !string.IsNullOrWhiteSpace(x)));
+            journalTags = existingJournal.Tags;
+        }
+        else
+        {
+            journalTitle = "";
+            journalContent = "";
+            journalPrimaryMood = "";
+            journalSecondaryMoods = "";
+            journalTags = "";
+        }
+
+        formMessage = "";
+        showJournalModal = true;
+    }
+
+    private void CloseModal()
+    {
+        showJournalModal = false;
+        formMessage = "";
+    }
+
+    /* ---------------- SAVE ---------------- */
+    private async Task SaveJournal()
+    {
+        if (string.IsNullOrWhiteSpace(journalTitle) ||
+            string.IsNullOrWhiteSpace(journalContent))
+        {
+            formMessage = "Title and content are required.";
+            formMessageType = "danger";
+            return;
+        }
+
+        var moods = journalSecondaryMoods?
+            .Split(',', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries);
+
+        var model = new JournalViewModel
+        {
+            EntryDate = selectedDate,
+            Title = journalTitle,
+            Content = journalContent,
+            PrimaryMood = journalPrimaryMood,
+            SecondaryMood1 = moods?.ElementAtOrDefault(0),
+            SecondaryMood2 = moods?.ElementAtOrDefault(1),
+            Tags = journalTags
+        };
+
+        var result = await JournalService.AddOrUpdateJournalAsync(
+            Session.CurrentUser!.UserId,
+            model
+        );
+
+        if (!result.Success)
+        {
+            formMessage = result.ErrorMessage!;
+            formMessageType = "danger";
+            return;
+        }
+
+        // Mark date as having journal
+        dateHasJournal[selectedDate] = true;
+
+        await Task.Delay(700);
+        showJournalModal = false;
+        StateHasChanged();
+    }
+
+    /* ---------------- HELPERS ---------------- */
+    private string GetGreeting()
+    {
+        var hour = DateTime.Now.Hour;
+        return hour < 12 ? "Good morning" :
+               hour < 18 ? "Good afternoon" : "Good evening";
+    }
+}

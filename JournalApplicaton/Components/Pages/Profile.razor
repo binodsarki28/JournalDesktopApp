@@ -1,0 +1,49 @@
+﻿@page "/profile"
+@using JournalApplicaton.Services
+
+@inject UserSessionService Session
+@inject NavigationManager Navigation
+
+<div class="container py-4">
+    @if (Session.CurrentUser == null)
+    {
+    <div class="alert alert-warning">
+        You are not logged in. Redirecting to login...
+    </div>
+    @code {
+        protected override void OnAfterRender(bool firstRender)
+        {
+            if (firstRender)
+                Navigation.NavigateTo("/login");
+        }
+    }
+        }
+        else
+    {
+        <div class="card shadow p-4" style="max-width: 500px; margin:auto;">
+            <h3 class="text-center mb-3">Profile</h3>
+
+            <div class="mb-3">
+                <strong>Name:</strong> @Session.CurrentUser.Name
+            </div>
+            <div class="mb-3">
+                <strong>Username:</strong> @Session.CurrentUser.Username
+            </div>
+            <div class="mb-3">
+                <strong>Email:</strong> @Session.CurrentUser.Email
+            </div>
+
+            <button class="btn btn-danger mt-3" @onclick="Logout">
+                Logout
+            </button>
+        </div>
+    }
+</div>
+
+@code {
+    private void Logout()
+    {
+        Session.Logout();
+        Navigation.NavigateTo("/login");
+    }
+}

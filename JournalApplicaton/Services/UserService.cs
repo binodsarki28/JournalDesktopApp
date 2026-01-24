@@ -20,7 +20,7 @@ public class UserService : IUserService
     {
         return new UserDisplayModel
         {
-            Id = user.Id,
+            UserId = user.UserId,
             Name = user.FullName,
             Email = user.Email,
         };
@@ -68,7 +68,7 @@ public class UserService : IUserService
             // 🔹 Map Entity → Display Model
             var displayModel = new UserDisplayModel
             {
-                Id = user.Id,
+                UserId = user.UserId,
                 Name = user.FullName,
                 Username = user.Username,
                 Email = user.Email
@@ -96,29 +96,13 @@ public class UserService : IUserService
 
         var display = new UserDisplayModel
         {
-            Id = user.Id,
+            UserId = user.UserId,
             Name = user.FullName,
             Username = user.Username,
             Email = user.Email
         };
 
         return ServiceResult<UserDisplayModel>.SuccessResult(display);
-    }
-    public async Task<ServiceResult<List<UserDisplayModel>>> GetAllUsersAsync()
-    {
-        try
-        {
-            var users = await _context.Users.ToListAsync();
-
-            // ✅ Map entities to display models
-            var displayModels = users.Select(MapToDisplayModel).ToList();
-
-            return ServiceResult<List<UserDisplayModel>>.SuccessResult(displayModels);
-        }
-        catch (Exception ex)
-        {
-            return ServiceResult<List<UserDisplayModel>>.FailureResult($"Error retrieving users: {ex.Message}");
-        }
     }
 
     public async Task<ServiceResult<UserDisplayModel>> GetUserByIdAsync(int id)
@@ -154,7 +138,7 @@ public class UserService : IUserService
 
             // Check for duplicate email (excluding current user)
             var duplicateEmail = await _context.Users
-                .AnyAsync(u => u.Email == viewModel.Email && u.Id != id);
+                .AnyAsync(u => u.Email == viewModel.Email && u.UserId != id);
 
             if (duplicateEmail)
             {

@@ -23,7 +23,10 @@ namespace JournalApplicaton
     		builder.Logging.AddDebug();
 
             builder.Services.AddScoped<IUserService, UserService>();
+            builder.Services.AddScoped<IJournalService, JournalService>();
             builder.Services.AddDbContext<AppDbContext>();
+            builder.Services.AddSingleton<UserSessionService>();
+
 
             var app = builder.Build();
 

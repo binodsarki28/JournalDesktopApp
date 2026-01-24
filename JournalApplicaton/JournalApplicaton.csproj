@@ -61,6 +61,14 @@
     </ItemGroup>
 
     <ItemGroup>
+      <Compile Remove="Entities\JournalEntity.cs" />
+    </ItemGroup>
+
+    <ItemGroup>
+      <Content Remove="Components\Pages\Profile.razor" />
+    </ItemGroup>
+
+    <ItemGroup>
         <PackageReference Include="BCrypt.Net-Next" Version="4.0.3" />
         <PackageReference Include="Microsoft.EntityFrameworkCore" Version="9.0.12" />
         <PackageReference Include="Microsoft.EntityFrameworkCore.Design" Version="9.0.12">
