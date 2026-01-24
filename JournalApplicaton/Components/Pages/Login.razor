@@ -51,21 +51,25 @@
     private string messageType = "danger";
     private bool isSubmitting = false;
 
+    @inject UserSessionService Session
+
     private async Task LoginUser()
     {
         if (isSubmitting) return;
 
         isSubmitting = true;
-
         var result = await UserService.LoginUserAsync(loginModel.Username, loginModel.Password);
 
         if (result.Success)
         {
+            // Save the current user
+            Session.SetCurrentUser(result.Data);
+
             message = "Login successful! Redirecting...";
             messageType = "success";
 
-            await Task.Delay(1000); // show message for 1s
-            Navigation.NavigateTo("/"); // redirect to home page
+            await Task.Delay(1000);
+            Navigation.NavigateTo("/"); // home page
         }
         else
         {
