@@ -1,6 +1,8 @@
 ﻿namespace JournalApplicaton.Model;
 
 using System.ComponentModel.DataAnnotations;
+using System.Diagnostics;
+
 public class JournalViewModel
 {
     public int JournalId { get; set; }
@@ -18,9 +20,8 @@ public class JournalViewModel
     [Required(ErrorMessage = "Primary Mood is required")]
     public string PrimaryMood { get; set; } = string.Empty;
 
-    public string? SecondaryMood1 { get; set; }
-    public string? SecondaryMood2 { get; set; }
+    public List<String> SecondaryMoods { get; set; } = new();
 
-    public string? Tags { get; set; }
+    public List<String> Tags { get; set; } = new();
 }
 

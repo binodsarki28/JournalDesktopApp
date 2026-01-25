@@ -37,8 +37,7 @@ public class JournalService : IJournalService
                     Content = model.Content,
                     EntryDate = model.EntryDate.Date,
                     PrimaryMood = model.PrimaryMood,
-                    SecondaryMood1 = model.SecondaryMood1,
-                    SecondaryMood2 = model.SecondaryMood2,
+                    SecondaryMoods = model.SecondaryMoods,
                     Tags = model.Tags,
                     WordCount = CountWords(model.Content),
                     UpdatedAt = DateTime.Now
@@ -52,8 +51,7 @@ public class JournalService : IJournalService
                 journal.Title = model.Title;
                 journal.Content = model.Content;
                 journal.PrimaryMood = model.PrimaryMood;
-                journal.SecondaryMood1 = model.SecondaryMood1;
-                journal.SecondaryMood2 = model.SecondaryMood2;
+                journal.SecondaryMoods = model.SecondaryMoods;
                 journal.Tags = model.Tags;
                 journal.WordCount = CountWords(model.Content);
                 journal.UpdatedAt = DateTime.Now;
@@ -104,8 +102,7 @@ public class JournalService : IJournalService
                 EntryDate = j.EntryDate,
                 Title = j.Title,
                 PrimaryMood = j.PrimaryMood,
-                SecondaryMood1 = j.SecondaryMood1,
-                SecondaryMood2 = j.SecondaryMood2,
+                SecondaryMoods = j.SecondaryMoods,
                 Tags = j.Tags,
                 WordCount = j.WordCount
             })

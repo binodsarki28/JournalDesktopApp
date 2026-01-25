@@ -14,10 +14,10 @@ public class Journal
     public DateTime EntryDate { get; set; }
 
     public string PrimaryMood { get; set; } = string.Empty;
-    public string? SecondaryMood1 { get; set; }
-    public string? SecondaryMood2 { get; set; }
 
-    public string? Tags { get; set; }
+    public List<String> SecondaryMoods { get; set; } = new();
+
+    public List<String> Tags { get; set; } = new();
 
     public int WordCount { get; set; }
     public DateTime UpdatedAt { get; set; } = DateTime.Now;

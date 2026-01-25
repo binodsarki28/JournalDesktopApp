@@ -35,9 +35,20 @@
                     <td>@j.PrimaryMood</td>
                     <td>@j.WordCount</td>
                     <td>
-                        <button class="btn btn-sm btn-info me-1" @onclick="() => ViewJournalDetails(j)">View</button>
-                        <button class="btn btn-sm btn-warning me-1" @onclick="() => EditJournal(j)">Edit</button>
-                        <button class="btn btn-sm btn-danger" @onclick="() => ConfirmDelete(j)">Delete</button>
+                        <button class="btn btn-sm btn-info me-1"
+                                @onclick="() => ViewJournalDetails(j)">
+                            View
+                        </button>
+
+                        <button class="btn btn-sm btn-warning me-1"
+                                @onclick="() => EditJournal(j)">
+                            Edit
+                        </button>
+
+                        <button class="btn btn-sm btn-danger"
+                                @onclick="() => ConfirmDelete(j)">
+                            Delete
+                        </button>
                     </td>
                 </tr>
             }
@@ -53,11 +64,26 @@
             <div class="modal-content p-4">
                 <h5>@(journalToEdit == null ? "Create Journal" : "Edit Journal")</h5>
 
-                <input class="form-control mb-2" placeholder="Title" @bind="journalTitle" />
-                <textarea class="form-control mb-2" rows="6" placeholder="Content" @bind="journalContent"></textarea>
-                <input class="form-control mb-2" placeholder="Primary Mood" @bind="journalPrimaryMood" />
-                <input class="form-control mb-2" placeholder="Secondary moods (comma separated)" @bind="journalSecondaryMoods" />
-                <input class="form-control mb-2" placeholder="Tags" @bind="journalTags" />
+                <input class="form-control mb-2"
+                       placeholder="Title"
+                       @bind="journalTitle" />
+
+                <textarea class="form-control mb-2"
+                          rows="6"
+                          placeholder="Content"
+                          @bind="journalContent"></textarea>
+
+                <input class="form-control mb-2"
+                       placeholder="Primary Mood"
+                       @bind="journalPrimaryMood" />
+
+                <input class="form-control mb-2"
+                       placeholder="Secondary moods (comma separated)"
+                       @bind="secondaryMoodInput" />
+
+                <input class="form-control mb-2"
+                       placeholder="Tags"
+                       @bind="tagsInput" />
 
                 @if (!string.IsNullOrEmpty(formMessage))
                 {
@@ -80,15 +106,21 @@
         <div class="modal-dialog modal-lg">
             <div class="modal-content p-4">
                 <h5>Journal Details</h5>
+
                 <p><strong>Date:</strong> @journalTitleDate.ToShortDateString()</p>
                 <p><strong>Title:</strong> @journalTitle</p>
+
                 <p><strong>Content:</strong></p>
                 <p>@journalContent</p>
-                <p><strong>Primary Mood:</strong> @journalPrimaryMood</p>
-                <p><strong>Secondary Moods:</strong> @journalSecondaryMoods</p>
-                <p><strong>Tags:</strong> @journalTags</p>
 
-                <button class="btn btn-secondary mt-2" @onclick="CloseViewModal">Close</button>
+                <p><strong>Primary Mood:</strong> @journalPrimaryMood</p>
+                <p><strong>Secondary Moods:</strong> @secondaryMoodInput</p>
+                <p><strong>Tags:</strong> @tagsInput</p>
+                <p><strong>Word Count:</strong>@wordCount</p>
+
+                <button class="btn btn-secondary mt-2" @onclick="CloseViewModal">
+                    Close
+                </button>
             </div>
         </div>
     </div>
@@ -101,15 +133,24 @@
         <div class="modal-dialog">
             <div class="modal-content p-4">
                 <h5>Are you sure you want to delete?</h5>
-                <button class="btn btn-danger me-2" @onclick="DeleteJournal">Yes, Delete</button>
-                <button class="btn btn-secondary" @onclick="() => showDeleteConfirm = false">Cancel</button>
+
+                <button class="btn btn-danger me-2" @onclick="DeleteJournal">
+                    Yes, Delete
+                </button>
+
+                <button class="btn btn-secondary"
+                        @onclick="() => showDeleteConfirm = false">
+                    Cancel
+                </button>
             </div>
         </div>
     </div>
 }
 
 @code {
+
     List<JournalDisplayModel> journals = new();
+
     JournalDisplayModel? journalToEdit;
     JournalDisplayModel? journalToDelete;
 
@@ -117,39 +158,51 @@
     bool showViewModal = false;
     bool showDeleteConfirm = false;
 
+    string todayMessage = "";
     string formMessage = "";
 
-    string todayMessage = "";
     string journalTitle = "";
     string journalContent = "";
     string journalPrimaryMood = "";
-    string journalSecondaryMoods = "";
-    string journalTags = "";
+
+    // 🔑 UI-safe string inputs
+    string secondaryMoodInput = "";
+    string tagsInput = "";
+
+    int wordCount;
+
     DateTime journalTitleDate;
 
-    protected override async Task OnInitializedAsync() => await LoadJournals();
+    protected override async Task OnInitializedAsync()
+        => await LoadJournals();
 
     private async Task LoadJournals()
     {
-        var (list, _) = await JournalService.GetAllJournalsByUserAsync(Session.CurrentUser!.UserId);
+        var (list, _) =
+            await JournalService.GetAllJournalsByUserAsync(
+                Session.CurrentUser!.UserId);
+
         journals = list;
 
-        // Check if today already has journal
-        var todayJournal = await JournalService.HasJournalForTodayAsync(Session.CurrentUser!.UserId);
-        todayMessage = todayJournal ? "You already created a journal for today." : "";
+        var hasToday =
+            await JournalService.HasJournalForTodayAsync(
+                Session.CurrentUser!.UserId);
+
+        todayMessage = hasToday
+            ? "You already created a journal for today."
+            : "";
     }
 
     private async void CreateTodayJournal()
     {
-        var hasToday = await JournalService.HasJournalForTodayAsync(Session.CurrentUser!.UserId);
-        if (hasToday)
+        if (await JournalService.HasJournalForTodayAsync(
+                Session.CurrentUser!.UserId))
         {
             todayMessage = "You already created a journal for today.";
             return;
         }
 
         journalToEdit = null;
-        journalTitle = journalContent = journalPrimaryMood = journalSecondaryMoods = journalTags = "";
         showModal = true;
     }
 
@@ -157,15 +210,22 @@
     {
         journalToEdit = j;
 
-        // Fetch full journal from service in case table model is incomplete
-        var fullJournal = await JournalService.GetJournalByDateAsync(Session.CurrentUser!.UserId, j.EntryDate);
+        var fullJournal =
+            await JournalService.GetJournalByDateAsync(
+                Session.CurrentUser!.UserId,
+                j.EntryDate);
+
         if (fullJournal != null)
         {
             journalTitle = fullJournal.Title;
             journalContent = fullJournal.Content;
             journalPrimaryMood = fullJournal.PrimaryMood;
-            journalSecondaryMoods = string.Join(",", new[] { fullJournal.SecondaryMood1, fullJournal.SecondaryMood2 }.Where(x => !string.IsNullOrWhiteSpace(x)));
-            journalTags = fullJournal.Tags;
+
+            secondaryMoodInput =
+                string.Join(", ", fullJournal.SecondaryMoods);
+
+            tagsInput =
+                string.Join(", ", fullJournal.Tags);
         }
 
         formMessage = "";
@@ -181,26 +241,35 @@
 
     private async Task SaveJournal()
     {
-        if (string.IsNullOrWhiteSpace(journalTitle) || string.IsNullOrWhiteSpace(journalContent))
+        if (string.IsNullOrWhiteSpace(journalTitle) ||
+            string.IsNullOrWhiteSpace(journalContent))
         {
             formMessage = "Title and content are required.";
             return;
         }
 
-        var moods = journalSecondaryMoods?.Split(',', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries);
-
         var model = new JournalViewModel
         {
-            EntryDate = journalToEdit != null ? journalToEdit.EntryDate : DateTime.Today,
+            EntryDate = journalToEdit != null
+                ? journalToEdit.EntryDate
+                : DateTime.Today,
+
             Title = journalTitle,
             Content = journalContent,
             PrimaryMood = journalPrimaryMood,
-            SecondaryMood1 = moods?.ElementAtOrDefault(0),
-            SecondaryMood2 = moods?.ElementAtOrDefault(1),
-            Tags = journalTags
+
+            SecondaryMoods = secondaryMoodInput
+                .Split(',', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries)
+                .ToList(),
+
+            Tags = tagsInput
+                .Split(',', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries)
+                .ToList()
         };
 
-        var result = await JournalService.AddOrUpdateJournalAsync(Session.CurrentUser!.UserId, model);
+        var result =
+            await JournalService.AddOrUpdateJournalAsync(
+                Session.CurrentUser!.UserId, model);
 
         if (!result.Success)
         {
@@ -215,20 +284,32 @@
 
     private async Task ViewJournalDetails(JournalDisplayModel j)
     {
-        var fullJournal = await JournalService.GetJournalByDateAsync(Session.CurrentUser!.UserId, j.EntryDate);
+        var fullJournal =
+            await JournalService.GetJournalByDateAsync(
+                Session.CurrentUser!.UserId,
+                j.EntryDate);
+
         if (fullJournal != null)
         {
             journalTitle = fullJournal.Title;
             journalContent = fullJournal.Content;
             journalPrimaryMood = fullJournal.PrimaryMood;
-            journalSecondaryMoods = string.Join(",", new[] { fullJournal.SecondaryMood1, fullJournal.SecondaryMood2 }.Where(x => !string.IsNullOrWhiteSpace(x)));
-            journalTags = fullJournal.Tags;
+
+            secondaryMoodInput =
+                string.Join(", ", fullJournal.SecondaryMoods);
+
+            tagsInput =
+                string.Join(", ", fullJournal.Tags);
+
+            wordCount = fullJournal.WordCount;
+
             journalTitleDate = fullJournal.EntryDate;
             showViewModal = true;
         }
     }
 
-    private void CloseViewModal() => showViewModal = false;
+    private void CloseViewModal()
+        => showViewModal = false;
 
     private void ConfirmDelete(JournalDisplayModel j)
     {
@@ -239,7 +320,11 @@
     private async Task DeleteJournal()
     {
         if (journalToDelete == null) return;
-        await JournalService.DeleteJournalAsync(Session.CurrentUser!.UserId, journalToDelete.JournalId);
+
+        await JournalService.DeleteJournalAsync(
+            Session.CurrentUser!.UserId,
+            journalToDelete.JournalId);
+
         showDeleteConfirm = false;
         await LoadJournals();
     }

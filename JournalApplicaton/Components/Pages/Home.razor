@@ -120,15 +120,11 @@
                                 <input class="form-control" @bind="journalPrimaryMood" />
                             </div>
 
-                            <div class="mb-3">
-                                <label class="form-label">Secondary Moods (comma separated)</label>
-                                <input class="form-control" @bind="journalSecondaryMoods" />
-                            </div>
+                            <input class="form-control" @bind="secondaryMoodInput"
+                                   placeholder="Comma separated moods" />
 
-                            <div class="mb-3">
-                                <label class="form-label">Tags</label>
-                                <input class="form-control" @bind="journalTags" />
-                            </div>
+                            <input class="form-control" @bind="tagsInput"
+                                   placeholder="Comma separated tags" />
 
                             @if (!string.IsNullOrEmpty(formMessage))
                             {
@@ -155,8 +151,13 @@
     private string journalTitle = "";
     private string journalContent = "";
     private string journalPrimaryMood = "";
-    private string journalSecondaryMoods = "";
-    private string journalTags = "";
+
+    private List<string> journalSecondaryMoods = new();
+    private List<string> journalTags = new();
+
+    private string secondaryMoodInput = "";
+    private string tagsInput = "";
+
 
     private string formMessage = "";
     private string formMessageType = "danger";
@@ -187,8 +188,11 @@
         journalTitle = journal?.Title ?? "";
         journalContent = journal?.Content ?? "";
         journalPrimaryMood = journal?.PrimaryMood ?? "";
-        journalSecondaryMoods = string.Join(",", new[] { journal?.SecondaryMood1, journal?.SecondaryMood2 }.Where(x => !string.IsNullOrWhiteSpace(x)));
-        journalTags = journal?.Tags ?? "";
+        journalSecondaryMoods = journal?.SecondaryMoods ?? new();
+        journalTags = journal?.Tags ?? new();
+
+        secondaryMoodInput = string.Join(", ", journalSecondaryMoods);
+        tagsInput = string.Join(", ", journalTags);
 
         formMessage = "";
         showJournalModal = true;
@@ -209,7 +213,13 @@
             return;
         }
 
-        var moods = journalSecondaryMoods?.Split(',', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries);
+        journalSecondaryMoods = secondaryMoodInput
+    .Split(',', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries)
+    .ToList();
+
+        journalTags = tagsInput
+            .Split(',', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries)
+            .ToList();
 
         var model = new JournalViewModel
         {
@@ -217,8 +227,7 @@
             Title = journalTitle,
             Content = journalContent,
             PrimaryMood = journalPrimaryMood,
-            SecondaryMood1 = moods?.ElementAtOrDefault(0),
-            SecondaryMood2 = moods?.ElementAtOrDefault(1),
+            SecondaryMoods = journalSecondaryMoods,
             Tags = journalTags
         };
 
