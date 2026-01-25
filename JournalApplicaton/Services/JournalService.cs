@@ -134,4 +134,97 @@ public class JournalService : IJournalService
             j.UserId == userId &&
             j.EntryDate.Date == DateTime.Today);
     }
+
+    public async Task<List<Journal>> GetAllJournalsForAnalyticsAsync(int userId)
+    {
+        return await _context.Journals
+            .Where(j => j.UserId == userId)
+            .OrderBy(j => j.EntryDate)
+            .ToListAsync();
+    }
+
+    public async Task<JournalStatsModel> GetJournalStatsAsync(int userId)
+    {
+        var journals = await GetAllJournalsForAnalyticsAsync(userId);
+
+        if (!journals.Any())
+            return new JournalStatsModel();
+
+        var dates = journals
+            .Select(j => j.EntryDate.Date)
+            .Distinct()
+            .OrderBy(d => d)
+            .ToList();
+
+        // ===== CURRENT STREAK =====
+        int currentStreak = 0;
+        var today = DateTime.Today;
+
+        DateTime? streakStart = null;
+
+        if (dates.Contains(today))
+        {
+            streakStart = today;
+        }
+        else if (dates.Contains(today.AddDays(-1)))
+        {
+            streakStart = today.AddDays(-1);
+        }
+        else
+        {
+            currentStreak = 0;
+        }
+
+        if (streakStart != null)
+        {
+            currentStreak = 1;
+
+            for (int i = dates.IndexOf(streakStart.Value) - 1; i >= 0; i--)
+            {
+                if (dates[i] == dates[i + 1].AddDays(-1))
+                    currentStreak++;
+                else
+                    break;
+            }
+        }
+
+
+        // ===== LONGEST STREAK =====
+        int longestStreak = 1;
+        int tempStreak = 1;
+
+        for (int i = 1; i < dates.Count; i++)
+        {
+            if (dates[i] == dates[i - 1].AddDays(1))
+            {
+                tempStreak++;
+                longestStreak = Math.Max(longestStreak, tempStreak);
+            }
+            else
+            {
+                tempStreak = 1;
+            }
+        }
+
+        // ===== THIS MONTH =====
+        var now = DateTime.Today;
+
+        var thisMonthJournals = journals.Where(j =>
+            j.EntryDate.Month == now.Month &&
+            j.EntryDate.Year == now.Year).ToList();
+
+        int thisMonthEntries = thisMonthJournals.Count;
+
+        double avgWordCount = thisMonthEntries == 0
+            ? 0
+            : thisMonthJournals.Average(j => j.WordCount);
+
+        return new JournalStatsModel
+        {
+            CurrentStreak = currentStreak,
+            LongestStreak = longestStreak,
+            ThisMonthEntries = thisMonthEntries,
+            AverageWordCountThisMonth = Math.Round(avgWordCount, 1)
+        };
+    }
 }

@@ -16,5 +16,9 @@ public interface IJournalService
 
     Task<bool> HasJournalForTodayAsync(int userId);
 
+    Task<List<Journal>> GetAllJournalsForAnalyticsAsync(int userId);
+
+    Task<JournalStatsModel> GetJournalStatsAsync(int userId);
+
 }
 
