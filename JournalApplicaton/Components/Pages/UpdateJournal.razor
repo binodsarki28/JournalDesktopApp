@@ -1,0 +1,111 @@
+﻿@page "/journal/edit/{date:datetime?}"
+@using JournalApplicaton.Model
+@using JournalApplicaton.Services
+@inject IJournalService JournalService
+@inject UserSessionService Session
+@inject NavigationManager Nav
+
+<div class="container py-4">
+
+    <div class="card shadow-sm">
+        <div class="card-body">
+
+            <h4>@(date == null ? "Write Journal" : "Edit Journal")</h4>
+
+            <input class="form-control mb-3"
+                   placeholder="Title"
+                   @bind="title" />
+
+            <textarea class="form-control mb-3"
+                      rows="8"
+                      placeholder="Write your thoughts..."
+                      @bind="content"></textarea>
+
+            <input class="form-control mb-3"
+                   placeholder="Primary mood"
+                   @bind="primaryMood" />
+
+            <input class="form-control mb-3"
+                   placeholder="Secondary moods (comma separated)"
+                   @bind="secondaryMoods" />
+
+            <input class="form-control mb-3"
+                   placeholder="Tags"
+                   @bind="tags" />
+
+            @if (!string.IsNullOrEmpty(error))
+            {
+                <div class="alert alert-danger">@error</div>
+            }
+
+            <button class="btn btn-success"
+                    @onclick="Save">
+                Update Journal
+            </button>
+
+        </div>
+    </div>
+
+</div>
+
+@code {
+
+    [Parameter]
+    public DateTime? date { get; set; }
+
+    string title = "";
+    string content = "";
+    string primaryMood = "";
+    string secondaryMoods = "";
+    string tags = "";
+    string error = "";
+
+    protected override async Task OnInitializedAsync()
+    {
+        if (date != null)
+        {
+            var journal =
+                await JournalService.GetJournalByDateAsync(
+                    Session.CurrentUser!.UserId,
+                    date.Value);
+
+            if (journal != null)
+            {
+                title = journal.Title;
+                content = journal.Content;
+                primaryMood = journal.PrimaryMood;
+                secondaryMoods = string.Join(", ", journal.SecondaryMoods);
+                tags = string.Join(", ", journal.Tags);
+            }
+        }
+    }
+
+    private async Task Save()
+    {
+        if (string.IsNullOrWhiteSpace(title) ||
+            string.IsNullOrWhiteSpace(content))
+        {
+            error = "Title and content are required.";
+            return;
+        }
+
+        var model = new JournalViewModel
+        {
+            EntryDate = date ?? DateTime.Today,
+            Title = title,
+            Content = content,
+            PrimaryMood = primaryMood,
+            SecondaryMoods = secondaryMoods
+                .Split(',', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries)
+                .ToList(),
+            Tags = tags
+                .Split(',', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries)
+                .ToList()
+        };
+
+        await JournalService.AddOrUpdateJournalAsync(
+            Session.CurrentUser!.UserId, model);
+
+        Nav.NavigateTo("/journal");
+    }
+}

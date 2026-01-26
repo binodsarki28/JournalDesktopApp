@@ -4,6 +4,10 @@ using JournalApplicaton.Model;
 using JournalApplicaton.Data;
 using Microsoft.EntityFrameworkCore;
 
+using QuestPDF.Fluent;
+using QuestPDF.Helpers;
+using QuestPDF.Infrastructure;
+
 namespace JournalApplicaton.Services;
 
 public class JournalService : IJournalService
@@ -111,18 +115,18 @@ public class JournalService : IJournalService
         return (journals, totalCount);
     }
 
-    public async Task<bool> DeleteJournalAsync(int userId, int journalId)
+    public async Task DeleteJournalAsync(int userId, DateTime date)
     {
         var journal = await _context.Journals
-            .FirstOrDefaultAsync(j => j.JournalId == journalId && j.UserId == userId);
+            .FirstOrDefaultAsync(j =>
+                j.UserId == userId &&
+                j.EntryDate.Date == date.Date);
 
         if (journal == null)
-            return false;
+            return;
 
         _context.Journals.Remove(journal);
         await _context.SaveChangesAsync();
-
-        return true;
     }
 
     public async Task<bool> HasJournalForTodayAsync(int userId)
@@ -131,4 +135,215 @@ public class JournalService : IJournalService
             j.UserId == userId &&
             j.EntryDate.Date == DateTime.Today);
     }
+
+    public async Task<JournalAnalyticsResult> GetAnalyticsResultAsync(int userId)
+    {
+        var journals = await _context.Journals
+            .Where(j => j.UserId == userId)
+            .OrderBy(j => j.EntryDate)
+            .ToListAsync();
+
+        if (!journals.Any())
+            return new JournalAnalyticsResult();
+
+        var dates = journals
+            .Select(j => j.EntryDate.Date)
+            .Distinct()
+            .ToList();
+
+        return new JournalAnalyticsResult
+        {
+            CurrentStreak = CalculateCurrentStreak(dates),
+            LongestStreak = CalculateLongestStreak(dates),
+            MissedDays = CalculateMissedDays(dates),
+            MoodDistribution = CalculateMoodDistribution(journals),
+            TagDistribution = CalculateTagDistribution(journals),
+            WordCountTrend = CalculateWordCountTrend(journals)
+        };
+    }
+
+    // ======================= STREAK LOGIC =======================
+    private int CalculateCurrentStreak(List<DateTime> dates)
+    {
+        var set = dates.ToHashSet();
+        var today = DateTime.Today;
+
+        // If today not written → streak = 0
+        if (!set.Contains(today))
+            return 0;
+
+        int streak = 0;
+        while (set.Contains(today.AddDays(-streak)))
+            streak++;
+
+        return streak;
+    }
+
+    private int CalculateLongestStreak(List<DateTime> dates)
+    {
+        var ordered = dates.OrderBy(d => d).ToList();
+        int longest = 0;
+        int current = 1;
+
+        for (int i = 1; i < ordered.Count; i++)
+        {
+            if ((ordered[i] - ordered[i - 1]).Days == 1)
+            {
+                current++;
+            }
+            else
+            {
+                longest = Math.Max(longest, current);
+                current = 1;
+            }
+        }
+
+        return Math.Max(longest, current);
+    }
+
+    private int CalculateMissedDays(List<DateTime> dates)
+    {
+        var firstDate = dates.Min();
+        var totalDays = (DateTime.Today - firstDate).Days + 1;
+
+        return totalDays - dates.Count;
+    }
+
+    // ======================= MOOD ANALYTICS =======================
+    private Dictionary<string, int> CalculateMoodDistribution(List<Journal> journals)
+    {
+        return journals
+            .Select(j => j.PrimaryMood)
+            .GroupBy(t => t)
+            .ToDictionary(g => g.Key, g => g.Count());
+    }
+
+    // ======================= TAG ANALYTICS =======================
+    private Dictionary<string, int> CalculateTagDistribution(List<Journal> journals)
+    {
+        return journals
+            .SelectMany(j => j.Tags)
+            .GroupBy(t => t)
+            .ToDictionary(g => g.Key, g => g.Count());
+    }
+
+    // ======================= WORD COUNT TREND =======================
+    private List<WordCountTrend> CalculateWordCountTrend(List<Journal> journals)
+    {
+        return journals
+            .OrderBy(j => j.EntryDate)
+            .Select(j => new WordCountTrend
+            {
+                Date = j.EntryDate,
+                WordCount = j.WordCount,
+                PrimaryMood = j.PrimaryMood
+            })
+            .ToList();
+    }
+
+    public async Task<(List<JournalDisplayModel>, int)>
+        SearchJournalsAsync(
+            int userId,
+            string searchText,
+            DateTime? fromDate,
+            DateTime? toDate,
+            int page,
+            int pageSize)
+    {
+        var query = _context.Journals
+            .Where(j => j.UserId == userId);
+
+        // 🔍 TEXT SEARCH
+        if (!string.IsNullOrWhiteSpace(searchText))
+        {
+            query = query.Where(j =>
+                j.Title.Contains(searchText) ||
+                j.PrimaryMood.Contains(searchText) ||
+                j.Tags.Any(t => t.Contains(searchText)));
+        }
+
+        // 📅 DATE FILTER
+        if (fromDate.HasValue)
+            query = query.Where(j => j.EntryDate >= fromDate.Value);
+
+        if (toDate.HasValue)
+            query = query.Where(j => j.EntryDate <= toDate.Value);
+
+        var totalCount = await query.CountAsync();
+
+        var journals = await query
+            .OrderByDescending(j => j.EntryDate)
+            .Skip((page - 1) * pageSize)
+            .Take(pageSize)
+            .Select(j => new JournalDisplayModel
+            {
+                JournalId = j.JournalId,
+                EntryDate = j.EntryDate,
+                Title = j.Title,
+                Content = j.Content,
+                PrimaryMood = j.PrimaryMood,
+                SecondaryMoods = j.SecondaryMoods,
+                Tags = j.Tags,
+                WordCount = j.WordCount
+            })
+            .ToListAsync();
+
+        return (journals, totalCount);
+    }
+
+    public async Task<byte[]> GenerateJournalPdfAsync(
+    int userId,
+    DateTime fromDate,
+    DateTime toDate)
+    {
+        var journals = await _context.Journals
+            .Where(j =>
+                j.UserId == userId &&
+                j.EntryDate >= fromDate &&
+                j.EntryDate <= toDate)
+            .OrderBy(j => j.EntryDate)
+            .ToListAsync();
+
+        var document = Document.Create(container =>
+        {
+            container.Page(page =>
+            {
+                page.Size(PageSizes.A4);
+                page.Margin(30);
+                page.DefaultTextStyle(x => x.FontSize(11));
+
+                page.Header()
+                    .Text($"Journal Report ({fromDate:dd MMM yyyy} - {toDate:dd MMM yyyy})")
+                    .SemiBold().FontSize(16).AlignCenter();
+
+                page.Content().Column(col =>
+                {
+                    foreach (var j in journals)
+                    {
+                        col.Item().PaddingBottom(10).BorderBottom(1).Column(c =>
+                        {
+                            c.Item().Text(j.EntryDate.ToString("dd MMM yyyy"))
+                                .SemiBold().FontSize(12);
+
+                            c.Item().Text(j.Title).SemiBold();
+                            c.Item().Text($"Mood: {j.PrimaryMood}");
+                            c.Item().Text($"Words: {j.WordCount}");
+                            c.Item().Text(j.Content);
+                        });
+                    }
+                });
+
+                page.Footer()
+                    .AlignCenter()
+                    .Text(x =>
+                    {
+                        x.Span("Generated on ");
+                        x.Span(DateTime.Now.ToString("dd MMM yyyy HH:mm"));
+                    });
+            });
+        });
+
+        return document.GeneratePdf();
+    }
+
 }

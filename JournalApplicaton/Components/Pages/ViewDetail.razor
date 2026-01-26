@@ -1,0 +1,99 @@
+﻿@page "/journal/view/{date:datetime}"
+
+@using JournalApplicaton.Model
+@using JournalApplicaton.Services
+@inject IJournalService JournalService
+@inject UserSessionService Session
+@inject NavigationManager Nav
+
+<div class="container py-4">
+
+    <button class="btn btn-link mb-3" @onclick="GoBack">
+        ← Back to Journals
+    </button>
+
+        <div class="card shadow-lg border-0">
+            <div class="card-body">
+
+                <span class="badge bg-primary mb-3">
+                    @journalPrimaryMood
+                </span>
+
+                <hr />
+
+                <p style="white-space: pre-line">
+                    @journalContent
+                </p>
+
+                <hr />
+
+                <p>
+                    <strong>Secondary moods:</strong>
+                    @string.Join(", ", journalSecondaryMoods ?? new List<string>())
+                </p>
+
+                <p>
+                    <strong>Tags:</strong>
+                    @string.Join(", ", journalTags ?? new List<string>())
+                </p>
+
+                <p>
+                    <strong>Word count:</strong> @wordCount
+                </p>
+
+                <a class="btn btn-warning mt-3"
+                   href="/journal/edit/@journalEntryDate.ToString("yyyy-MM-dd")">
+                    ✏ Edit Journal
+                </a>
+
+            </div>
+        </div>
+</div>
+
+@code {
+
+    [Parameter]
+    public DateTime date { get; set; }
+
+    private string journalTitle = "";
+    private string journalContent = "";
+    private string journalPrimaryMood = "";
+
+    private List<string> journalSecondaryMoods = new();
+    private List<string> journalTags = new();
+
+    private string secondaryMoodInput = "";
+    private string tagsInput = "";
+    private int wordCount = 0;
+    private DateTime journalEntryDate;
+
+    protected override async Task OnInitializedAsync()
+    {
+        if (Session.CurrentUser == null)
+        {
+            Nav.NavigateTo("/login");
+            return;
+        }
+
+        var journal = await JournalService.GetJournalByDateAsync(
+            Session.CurrentUser!.UserId,
+            date
+        );
+
+        journalTitle = journal?.Title ?? "";
+        journalContent = journal?.Content ?? "";
+        journalPrimaryMood = journal?.PrimaryMood ?? "";
+        journalSecondaryMoods = journal?.SecondaryMoods ?? new();
+        journalTags = journal?.Tags ?? new();
+        journalEntryDate = journal.EntryDate;
+
+        secondaryMoodInput = string.Join(", ", journalSecondaryMoods);
+        tagsInput = string.Join(", ", journalTags);
+        wordCount = journal?.WordCount ?? 0;
+    }
+
+    private void GoBack()
+    {
+        Nav.NavigateTo("/journal");
+    }
+}

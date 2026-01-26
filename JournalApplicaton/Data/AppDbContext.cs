@@ -16,7 +16,6 @@ public class AppDbContext : DbContext
         var folder = Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData);
         _dbPath = System.IO.Path.Combine(folder, "app.db");
     }
-
     protected override void OnConfiguring(DbContextOptionsBuilder optionsBuilder)
     {
         optionsBuilder.UseSqlite($"Data Source={_dbPath}");

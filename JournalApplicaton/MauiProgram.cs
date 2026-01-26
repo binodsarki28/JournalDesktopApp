@@ -27,6 +27,7 @@ namespace JournalApplicaton
             builder.Services.AddDbContext<AppDbContext>();
             builder.Services.AddSingleton<UserSessionService>();
 
+            QuestPDF.Settings.License = QuestPDF.Infrastructure.LicenseType.Community;
 
             var app = builder.Build();
 

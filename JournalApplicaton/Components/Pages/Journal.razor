@@ -1,331 +1,261 @@
 ﻿@page "/journal"
 @using JournalApplicaton.Model
 @using JournalApplicaton.Services
-@inject UserSessionService Session
 @inject IJournalService JournalService
+@inject UserSessionService Session
+@inject NavigationManager Nav
 
 <div class="container py-4">
-    <h3>Journal Management</h3>
 
-    <button class="btn btn-success mb-3" @onclick="CreateTodayJournal">
-        + Create Journal Today
-    </button>
+    <div class="d-flex justify-content-between align-items-center mb-4">
+        <h3>📓 My Journals</h3>
+        <a class="btn btn-success" href="/journal/edit">
+            + Write Today
+        </a>
+    </div>
 
-    @if (!string.IsNullOrEmpty(todayMessage))
-    {
-        <div class="alert alert-info">@todayMessage</div>
-    }
+    <!-- 🔍 FILTER BAR -->
+    <div class="card shadow-sm mb-4">
+        <div class="card-body">
+            <div class="row g-3 align-items-end">
 
-    <table class="table table-hover">
-        <thead>
-            <tr>
-                <th>Date</th>
-                <th>Title</th>
-                <th>Mood</th>
-                <th>Words</th>
-                <th>Actions</th>
-            </tr>
-        </thead>
-        <tbody>
-            @foreach (var j in journals)
-            {
-                <tr>
-                    <td>@j.EntryDate.ToShortDateString()</td>
-                    <td>@j.Title</td>
-                    <td>@j.PrimaryMood</td>
-                    <td>@j.WordCount</td>
-                    <td>
-                        <button class="btn btn-sm btn-info me-1"
-                                @onclick="() => ViewJournalDetails(j)">
-                            View
-                        </button>
-
-                        <button class="btn btn-sm btn-warning me-1"
-                                @onclick="() => EditJournal(j)">
-                            Edit
-                        </button>
-
-                        <button class="btn btn-sm btn-danger"
-                                @onclick="() => ConfirmDelete(j)">
-                            Delete
-                        </button>
-                    </td>
-                </tr>
-            }
-        </tbody>
-    </table>
-</div>
-
-<!-- ================= CREATE / EDIT MODAL ================= -->
-@if (showModal)
-{
-    <div class="modal fade show d-block" style="background:rgba(0,0,0,0.6);">
-        <div class="modal-dialog modal-lg">
-            <div class="modal-content p-4">
-                <h5>@(journalToEdit == null ? "Create Journal" : "Edit Journal")</h5>
-
-                <input class="form-control mb-2"
-                       placeholder="Title"
-                       @bind="journalTitle" />
-
-                <textarea class="form-control mb-2"
-                          rows="6"
-                          placeholder="Content"
-                          @bind="journalContent"></textarea>
-
-                <input class="form-control mb-2"
-                       placeholder="Primary Mood"
-                       @bind="journalPrimaryMood" />
-
-                <input class="form-control mb-2"
-                       placeholder="Secondary moods (comma separated)"
-                       @bind="secondaryMoodInput" />
-
-                <input class="form-control mb-2"
-                       placeholder="Tags"
-                       @bind="tagsInput" />
-
-                @if (!string.IsNullOrEmpty(formMessage))
-                {
-                    <div class="alert alert-danger">@formMessage</div>
-                }
-
-                <div class="mt-3">
-                    <button class="btn btn-success me-2" @onclick="SaveJournal">Save</button>
-                    <button class="btn btn-secondary" @onclick="CloseModal">Close</button>
+                <div class="col-md-4">
+                    <label class="form-label">Search</label>
+                    <input class="form-control"
+                           placeholder="Title, mood, tags..."
+                           @bind="searchText" />
                 </div>
+
+                <div class="col-md-3">
+                    <label class="form-label">From</label>
+                    <input type="date"
+                           class="form-control"
+                           @bind="fromDate" />
+                </div>
+
+                <div class="col-md-3">
+                    <label class="form-label">To</label>
+                    <input type="date"
+                           class="form-control"
+                           @bind="toDate" />
+                </div>
+
+                <div class="col-md-2 d-grid">
+                    <button class="btn btn-primary"
+                            @onclick="ApplyFilters">
+                        Apply
+                    </button>
+                </div>
+
             </div>
         </div>
     </div>
-}
 
-<!-- ================= VIEW MODAL ================= -->
-@if (showViewModal)
-{
-    <div class="modal fade show d-block" style="background:rgba(0,0,0,0.6);">
-        <div class="modal-dialog modal-lg">
-            <div class="modal-content p-4">
-                <h5>Journal Details</h5>
+    <!-- 📊 TABLE -->
+    <div class="card shadow-sm">
+        <div class="card-body p-0">
+            <table class="table table-hover align-middle mb-0">
+                <thead class="table-light">
+                    <tr>
+                        <th>Date</th>
+                        <th>Title</th>
+                        <th>Mood</th>
+                        <th>Words</th>
+                        <th class="text-center" style="width:220px">Actions</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    @if (!journals.Any())
+                    {
+                        <tr>
+                            <td colspan="5" class="text-center text-muted py-4">
+                                No journals found
+                            </td>
+                        </tr>
+                    }
+                    else
+                    {
+                        @foreach (var j in journals)
+                        {
+                            <tr>
+                                <td>@j.EntryDate.ToString("dd MMM yyyy")</td>
+                                <td>@j.Title</td>
+                                <td>
+                                    <span class="badge bg-info">
+                                        @j.PrimaryMood
+                                    </span>
+                                </td>
+                                <td>@j.WordCount</td>
+                                <td class="text-center">
+                                    <div class="btn-group btn-group-sm">
 
-                <p><strong>Date:</strong> @journalTitleDate.ToShortDateString()</p>
-                <p><strong>Title:</strong> @journalTitle</p>
+                                        <a class="btn btn-outline-primary"
+                                           href="/journal/view/@j.EntryDate.ToString("yyyy-MM-dd")">
+                                            View
+                                        </a>
 
-                <p><strong>Content:</strong></p>
-                <p>@journalContent</p>
+                                        <a class="btn btn-outline-warning"
+                                           href="/journal/edit/@j.EntryDate.ToString("yyyy-MM-dd")">
+                                            Edit
+                                        </a>
 
-                <p><strong>Primary Mood:</strong> @journalPrimaryMood</p>
-                <p><strong>Secondary Moods:</strong> @secondaryMoodInput</p>
-                <p><strong>Tags:</strong> @tagsInput</p>
-                <p><strong>Word Count:</strong>@wordCount</p>
+                                        <button class="btn btn-outline-danger"
+                                                @onclick="() => ConfirmDelete(j.EntryDate)">
+                                            Delete
+                                        </button>
 
-                <button class="btn btn-secondary mt-2" @onclick="CloseViewModal">
-                    Close
-                </button>
-            </div>
+                                    </div>
+                                </td>
+                            </tr>
+                        }
+                    }
+                </tbody>
+            </table>
         </div>
     </div>
-}
 
-<!-- ================= DELETE CONFIRM ================= -->
-@if (showDeleteConfirm)
-{
-    <div class="modal fade show d-block" style="background:rgba(0,0,0,0.6);">
-        <div class="modal-dialog">
-            <div class="modal-content p-4">
-                <h5>Are you sure you want to delete?</h5>
+    <!-- 🔢 PAGINATION + PDF EXPORT -->
+    <div class="d-flex justify-content-between align-items-center mt-4">
 
-                <button class="btn btn-danger me-2" @onclick="DeleteJournal">
-                    Yes, Delete
-                </button>
+        <!-- LEFT: Pagination -->
+        <nav>
+            <ul class="pagination mb-0">
+                <li class="page-item @(currentPage == 1 ? "disabled" : "")">
+                    <button class="page-link"
+                            @onclick="() => ChangePage(currentPage - 1)">
+                        Previous
+                    </button>
+                </li>
 
-                <button class="btn btn-secondary"
-                        @onclick="() => showDeleteConfirm = false">
-                    Cancel
-                </button>
+                <li class="page-item active">
+                    <span class="page-link">@currentPage</span>
+                </li>
+
+                <li class="page-item @(journals.Count < pageSize ? "disabled" : "")">
+                    <button class="page-link"
+                            @onclick="() => ChangePage(currentPage + 1)">
+                        Next
+                    </button>
+                </li>
+            </ul>
+        </nav>
+
+        <!-- RIGHT: PDF Export -->
+        <div class="d-flex gap-2 align-items-end">
+            <div>
+                <label class="form-label mb-1">Start Date</label>
+                <input type="date" class="form-control" @bind="pdfFromDate" />
             </div>
+
+            <div>
+                <label class="form-label mb-1">End Date</label>
+                <input type="date" class="form-control" @bind="pdfToDate" />
+            </div>
+
+            <button class="btn btn-danger"
+                    @onclick="GeneratePdf"
+                    disabled="@(!pdfFromDate.HasValue || !pdfToDate.HasValue)">
+                📄 Generate PDF
+            </button>
         </div>
     </div>
-}
+</div>
 
 @code {
 
     List<JournalDisplayModel> journals = new();
 
-    JournalDisplayModel? journalToEdit;
-    JournalDisplayModel? journalToDelete;
+    string searchText = "";
+    DateTime? fromDate;
+    DateTime? toDate;
 
-    bool showModal = false;
-    bool showViewModal = false;
-    bool showDeleteConfirm = false;
-
-    string todayMessage = "";
-    string formMessage = "";
-
-    string journalTitle = "";
-    string journalContent = "";
-    string journalPrimaryMood = "";
-
-    // 🔑 UI-safe string inputs
-    string secondaryMoodInput = "";
-    string tagsInput = "";
-
-    int wordCount;
-
-    DateTime journalTitleDate;
+    int currentPage = 1;
+    int pageSize = 8;
 
     protected override async Task OnInitializedAsync()
-        => await LoadJournals();
+    {
+        if (Session.CurrentUser == null)
+        {
+            Nav.NavigateTo("/login");
+            return;
+        }
+
+        await LoadJournals();
+    }
 
     private async Task LoadJournals()
     {
         var (list, _) =
-            await JournalService.GetAllJournalsByUserAsync(
-                Session.CurrentUser!.UserId);
+            await JournalService.SearchJournalsAsync(
+                Session.CurrentUser!.UserId,
+                searchText,
+                fromDate,
+                toDate,
+                currentPage,
+                pageSize);
 
         journals = list;
-
-        var hasToday =
-            await JournalService.HasJournalForTodayAsync(
-                Session.CurrentUser!.UserId);
-
-        todayMessage = hasToday
-            ? "You already created a journal for today."
-            : "";
     }
 
-    private async void CreateTodayJournal()
+    private async Task ApplyFilters()
     {
-        if (await JournalService.HasJournalForTodayAsync(
-                Session.CurrentUser!.UserId))
-        {
-            todayMessage = "You already created a journal for today.";
-            return;
-        }
-
-        journalToEdit = null;
-        showModal = true;
-    }
-
-    private async void EditJournal(JournalDisplayModel j)
-    {
-        journalToEdit = j;
-
-        var fullJournal =
-            await JournalService.GetJournalByDateAsync(
-                Session.CurrentUser!.UserId,
-                j.EntryDate);
-
-        if (fullJournal != null)
-        {
-            journalTitle = fullJournal.Title;
-            journalContent = fullJournal.Content;
-            journalPrimaryMood = fullJournal.PrimaryMood;
-
-            secondaryMoodInput =
-                string.Join(", ", fullJournal.SecondaryMoods);
-
-            tagsInput =
-                string.Join(", ", fullJournal.Tags);
-        }
-
-        formMessage = "";
-        showModal = true;
-    }
-
-    private void CloseModal()
-    {
-        showModal = false;
-        journalToEdit = null;
-        formMessage = "";
-    }
-
-    private async Task SaveJournal()
-    {
-        if (string.IsNullOrWhiteSpace(journalTitle) ||
-            string.IsNullOrWhiteSpace(journalContent))
-        {
-            formMessage = "Title and content are required.";
-            return;
-        }
-
-        var model = new JournalViewModel
-        {
-            EntryDate = journalToEdit != null
-                ? journalToEdit.EntryDate
-                : DateTime.Today,
-
-            Title = journalTitle,
-            Content = journalContent,
-            PrimaryMood = journalPrimaryMood,
-
-            SecondaryMoods = secondaryMoodInput
-                .Split(',', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries)
-                .ToList(),
-
-            Tags = tagsInput
-                .Split(',', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries)
-                .ToList()
-        };
-
-        var result =
-            await JournalService.AddOrUpdateJournalAsync(
-                Session.CurrentUser!.UserId, model);
-
-        if (!result.Success)
-        {
-            formMessage = result.ErrorMessage!;
-            return;
-        }
-
-        showModal = false;
-        journalToEdit = null;
+        currentPage = 1;
         await LoadJournals();
     }
 
-    private async Task ViewJournalDetails(JournalDisplayModel j)
+    private async Task ChangePage(int newPage)
     {
-        var fullJournal =
-            await JournalService.GetJournalByDateAsync(
-                Session.CurrentUser!.UserId,
-                j.EntryDate);
+        if (newPage < 1) return;
 
-        if (fullJournal != null)
-        {
-            journalTitle = fullJournal.Title;
-            journalContent = fullJournal.Content;
-            journalPrimaryMood = fullJournal.PrimaryMood;
-
-            secondaryMoodInput =
-                string.Join(", ", fullJournal.SecondaryMoods);
-
-            tagsInput =
-                string.Join(", ", fullJournal.Tags);
-
-            wordCount = fullJournal.WordCount;
-
-            journalTitleDate = fullJournal.EntryDate;
-            showViewModal = true;
-        }
+        currentPage = newPage;
+        await LoadJournals();
     }
 
-    private void CloseViewModal()
-        => showViewModal = false;
-
-    private void ConfirmDelete(JournalDisplayModel j)
+    private async Task ConfirmDelete(DateTime date)
     {
-        journalToDelete = j;
-        showDeleteConfirm = true;
-    }
-
-    private async Task DeleteJournal()
-    {
-        if (journalToDelete == null) return;
+        if (!await JSRuntime.InvokeAsync<bool>(
+            "confirm", "Are you sure you want to delete this journal?"))
+            return;
 
         await JournalService.DeleteJournalAsync(
             Session.CurrentUser!.UserId,
-            journalToDelete.JournalId);
+            date);
 
-        showDeleteConfirm = false;
         await LoadJournals();
     }
+
+    DateTime? pdfFromDate;
+    DateTime? pdfToDate;
+
+    private async Task GeneratePdf()
+    {
+        if (!pdfFromDate.HasValue || !pdfToDate.HasValue)
+            return;
+
+        var bytes = await JournalService.GenerateJournalPdfAsync(
+            Session.CurrentUser!.UserId,
+            pdfFromDate.Value,
+            pdfToDate.Value
+        );
+
+        var base64 = Convert.ToBase64String(bytes);
+
+        await JSRuntime.InvokeVoidAsync(
+            "downloadFileFromBase64",
+            $"journals_{pdfFromDate:yyyyMMdd}_{pdfToDate:yyyyMMdd}.pdf",
+            base64
+        );
+    }
+
+
+    [Inject] IJSRuntime JSRuntime { get; set; } = default!;
 }
+
+<script>
+        window.downloadFileFromBase64 = (fileName, base64) => {
+        const link = document.createElement("a");
+        link.href = "data:application/pdf;base64," + base64;
+        link.download = fileName;
+        link.click();
+    };
+</script>
