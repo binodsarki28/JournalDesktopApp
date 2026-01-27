@@ -1,13 +1,76 @@
-﻿@inherits LayoutComponentBase
+﻿@using JournalApplicaton.Services
+@inherits LayoutComponentBase
+@inject ThemeService ThemeService
+@implements IDisposable
+@inject UserSessionService Session
 
-<div class="page">
-    <div class="sidebar">
-        <NavMenu />
+<div class="app-root @(ThemeService.IsDark ? "dark" : "light")">
+
+    <!-- TOP APP BAR -->
+    <header class="appbar">
+        <header class="appbar">
+            <button class="sidebar-toggle" @onclick="ToggleSidebar">
+                ☰
+            </button>
+
+            <div class="app-title">Menu</div>
+
+            <div class="app-actions">
+                ...
+            </div>
+        </header>
+
+        <div class="app-title">JournalApplication</div>
+
+        <div class="app-actions">
+            <button class="theme-btn" @onclick="() => { ThemeService.ToggleTheme(); StateHasChanged(); }">
+                @(ThemeService.IsDark ? "🌙" : "☀️")
+            </button>
+
+            <div class="profile">
+                <svg width="32" height="32" viewBox="0 0 24 24" fill="currentColor" style="border-radius: 50%; background: rgba(255,255,255,0.2);">
+                    <circle cx="12" cy="8" r="4" />
+                    <path d="M12 14c-5 0-8 2.5-8 5v5h16v-5c0-2.5-3-5-8-5z" />
+                </svg>
+                <span class="profile-name"></span>
+                <div class="profile-menu">
+                    <a href="/login">Logout</a>
+                </div>
+            </div>
+        </div>
+    </header>
+
+    <!-- MAIN BODY -->
+    <div class="layout">
+        <aside class="sidebar @(isSidebarOpen ? "open" : "closed")">
+            <NavMenu />
+        </aside>
+
+        <main class="content @(isSidebarOpen ? "shifted" : "expanded")" >
+            @Body
+        </main>
     </div>
 
-    <main>
-        <article class="content px-4">
-            @Body
-        </article>
-    </main>
 </div>
+
+@code {
+    private bool isSidebarOpen = true;
+
+    protected override void OnInitialized()
+    {
+        ThemeService.OnThemeChanged += HandleThemeChanged;
+    }
+
+    private void ToggleSidebar()
+    {
+        isSidebarOpen = !isSidebarOpen;
+    }
+
+    private void HandleThemeChanged() => StateHasChanged();
+
+    void IDisposable.Dispose()
+    {
+        ThemeService.OnThemeChanged -= HandleThemeChanged;
+    }
+}
+

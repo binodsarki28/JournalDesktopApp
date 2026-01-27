@@ -1,54 +1,95 @@
 ﻿@page "/journal/view/{date:datetime}"
-
+@layout MainLayout
 @using JournalApplicaton.Model
 @using JournalApplicaton.Services
 @inject IJournalService JournalService
 @inject UserSessionService Session
 @inject NavigationManager Nav
 
-<div class="container py-4">
+<div class="container py-4 journal-view">
 
-    <button class="btn btn-link mb-3" @onclick="GoBack">
+    <button class="btn btn-link mb-3 back-btn" @onclick="GoBack">
         ← Back to Journals
     </button>
 
-        <div class="card shadow-lg border-0">
-            <div class="card-body">
+    <div class="card shadow-sm border-0 journal-card">
+        <div class="card-body">
 
-                <span class="badge bg-primary mb-3">
+            <!-- Title (Centered) -->
+            <h3 class="journal-title text-center">@journalTitle</h3>
+
+            <!-- Mood and Date Row -->
+            <div class="d-flex justify-content-between align-items-center mb-3">
+                <span class="badge mood-badge">
                     @journalPrimaryMood
                 </span>
-
-                <hr />
-
-                <p style="white-space: pre-line">
-                    @journalContent
-                </p>
-
-                <hr />
-
-                <p>
-                    <strong>Secondary moods:</strong>
-                    @string.Join(", ", journalSecondaryMoods ?? new List<string>())
-                </p>
-
-                <p>
-                    <strong>Tags:</strong>
-                    @string.Join(", ", journalTags ?? new List<string>())
-                </p>
-
-                <p>
-                    <strong>Word count:</strong> @wordCount
-                </p>
-
-                <a class="btn btn-warning mt-3"
-                   href="/journal/edit/@journalEntryDate.ToString("yyyy-MM-dd")">
-                    ✏ Edit Journal
-                </a>
-
+                <span class="journal-date">
+                    📅 @journalEntryDate.ToString("dd MMM yyyy")
+                </span>
             </div>
+
+            <hr />
+
+            <!-- Description Section -->
+            <div class="description-section mb-3">
+                <div class="d-flex flex-wrap gap-3">
+                    <!-- Secondary Moods -->
+                    <div class="flex-grow-1">
+                        <strong class="section-label">Secondary Moods:</strong>
+                        <div class="chip-container">
+                            @if (journalSecondaryMoods?.Any() == true)
+                            {
+                                @foreach (var mood in journalSecondaryMoods)
+                                {
+                                    <span class="chip mood-chip">@mood</span>
+                                }
+                            }
+                            else
+                            {
+                                <span class="text-muted small">None</span>
+                            }
+                        </div>
+                    </div>
+
+                    <!-- Tags -->
+                    <div class="flex-grow-1">
+                        <strong class="section-label">Tags:</strong>
+                        <div class="chip-container">
+                            @if (journalTags?.Any() == true)
+                            {
+                                @foreach (var tag in journalTags)
+                                {
+                                    <span class="chip tag-chip">#@tag</span>
+                                }
+                            }
+                            else
+                            {
+                                <span class="text-muted small">None</span>
+                            }
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Word Count -->
+            <div class="mb-2">
+                <span class="word-count-badge">📝 @wordCount words</span>
+            </div>
+
+            <hr />
+
+            <!-- Content -->
+            <div class="content-label mb-2">
+                <strong>Content:</strong>
+            </div>
+            <div class="journal-content">
+                @((MarkupString)journalContent)
+            </div>
+
         </div>
+    </div>
 </div>
+
 
 @code {
 
@@ -94,6 +135,143 @@
 
     private void GoBack()
     {
-        Nav.NavigateTo("/journal");
+        Nav.NavigateTo("/journals");
     }
 }
+
+<style>
+    .journal-view {
+        max-width: 900px;
+    }
+
+    .back-btn {
+        text-decoration: none;
+        font-weight: 500;
+        color: #6c757d;
+        transition: color 0.2s;
+    }
+
+        .back-btn:hover {
+            color: #495057;
+        }
+
+    .journal-card {
+        border-radius: 14px;
+        overflow: hidden;
+    }
+
+    .journal-title {
+        font-weight: 700;
+        font-size: 2rem;
+        margin-bottom: 20px;
+        color: #2c3e50;
+    }
+
+    .mood-badge {
+        background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+        padding: 8px 18px;
+        border-radius: 25px;
+        font-size: 0.9rem;
+        font-weight: 600;
+        color: white;
+        box-shadow: 0 2px 8px rgba(102, 126, 234, 0.3);
+    }
+
+    .journal-date {
+        font-size: 0.95rem;
+        color: #6c757d;
+        font-weight: 500;
+    }
+
+    .description-section {
+        background-color: #f8f9fa;
+        padding: 20px;
+        border-radius: 10px;
+        border-left: 4px solid #667eea;
+    }
+
+    .section-label {
+        font-size: 0.9rem;
+        color: #495057;
+        display: block;
+        margin-bottom: 8px;
+    }
+
+    .content-label {
+        font-size: 1.1rem;
+        color: #495057;
+    }
+
+    .word-count-badge {
+        background-color: #e7f3ff;
+        color: #0066cc;
+        padding: 6px 14px;
+        border-radius: 20px;
+        font-size: 0.85rem;
+        font-weight: 500;
+        display: inline-block;
+    }
+
+    .journal-content {
+        padding: 25px;
+        background-color: #fafaf8;
+        border-radius: 10px;
+        line-height: 1.8;
+        font-size: 1.05rem;
+        min-height: 200px;
+        border: 1px solid #e9ecef;
+    }
+
+    .chip-container {
+        display: flex;
+        flex-wrap: wrap;
+        gap: 8px;
+        margin-top: 8px;
+    }
+
+    .chip {
+        display: inline-block;
+        padding: 6px 14px;
+        border-radius: 20px;
+        font-size: 0.85rem;
+        font-weight: 500;
+        transition: transform 0.2s;
+    }
+
+        .chip:hover {
+            transform: translateY(-2px);
+        }
+
+    .mood-chip {
+        background-color: #dbeafe;
+        color: #1e40af;
+        border: 1px solid #bfdbfe;
+    }
+
+    .tag-chip {
+        background-color: #fef3c7;
+        color: #92400e;
+        border: 1px solid #fde68a;
+    }
+
+    .btn-warning {
+        background: linear-gradient(135deg, #f59e0b 0%, #d97706 100%);
+        border: none;
+        padding: 12px 30px;
+        border-radius: 25px;
+        font-weight: 600;
+        box-shadow: 0 4px 12px rgba(245, 158, 11, 0.3);
+        transition: transform 0.2s, box-shadow 0.2s;
+    }
+
+        .btn-warning:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 6px 16px rgba(245, 158, 11, 0.4);
+            background: linear-gradient(135deg, #d97706 0%, #b45309 100%);
+        }
+
+    hr {
+        border-color: #e9ecef;
+        opacity: 0.5;
+    }
+</style>

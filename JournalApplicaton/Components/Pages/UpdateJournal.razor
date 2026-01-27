@@ -1,89 +1,269 @@
 ﻿@page "/journal/edit/{date:datetime?}"
+
 @using JournalApplicaton.Model
 @using JournalApplicaton.Services
+@layout MainLayout
 @inject IJournalService JournalService
 @inject UserSessionService Session
 @inject NavigationManager Nav
+@inject IJSRuntime JS
+
+<button class="btn btn-link mb-3 back-btn" @onclick="GoBack">
+    ← Back to Journals
+</button>
 
 <div class="container py-4">
-
     <div class="card shadow-sm">
         <div class="card-body">
 
-            <h4>@(date == null ? "Write Journal" : "Edit Journal")</h4>
+            <h4 class="mb-3 text-center">
+                @(date == null ? "Write Journal" : "Edit Journal")
+            </h4>
 
+            <!-- TITLE -->
             <input class="form-control mb-3"
                    placeholder="Title"
                    @bind="title" />
 
-            <textarea class="form-control mb-3"
-                      rows="8"
-                      placeholder="Write your thoughts..."
-                      @bind="content"></textarea>
+            <!-- QUILL EDITOR -->
+            <label class="form-label">Content</label>
+            <div id="@EditorId"
+                 style="height:200px;border:1px solid #ced4da;border-radius:6px;background:white"
+                 class="mb-3">
+            </div>
 
-            <input class="form-control mb-3"
-                   placeholder="Primary mood"
-                   @bind="primaryMood" />
+            <!-- PRIMARY MOOD -->
+            <label class="form-label">Primary Mood</label>
+            <select class="form-select mb-3"
+                    @bind="primaryMood"
+                    @bind:after="OnPrimaryMoodChanged">
+                <option value="">-- Select Primary Mood --</option>
+                @foreach (var category in MoodCategories.Keys)
+                {
+                    <option value="@category">@category</option>
+                }
+            </select>
 
-            <input class="form-control mb-3"
-                   placeholder="Secondary moods (comma separated)"
-                   @bind="secondaryMoods" />
+            <!-- SECONDARY MOODS -->
+            @if (!string.IsNullOrEmpty(primaryMood))
+            {
+                <label class="form-label">Secondary Moods (max 2)</label>
 
-            <input class="form-control mb-3"
-                   placeholder="Tags"
-                   @bind="tags" />
+                <div class="border rounded p-3 mb-3" style="max-height: 200px; overflow-y: auto; background-color: #f8f9fa;">
+                    @foreach (var mood in MoodCategories[primaryMood])
+                    {
+                        <div class="form-check">
+                            <input class="form-check-input"
+                                   type="checkbox"
+                                   id="mood_@mood"
+                                   checked="@secondaryMoods.Contains(mood)"
+                                   @onchange="@((e) => ToggleSecondaryMood(mood, e))"
+                                   disabled="@(!secondaryMoods.Contains(mood) && secondaryMoods.Length >= 2)">
+                            <label class="form-check-label" for="mood_@mood">
+                                @mood
+                            </label>
+                        </div>
+                    }
+                </div>
+
+                @if (secondaryMoods.Length > 0)
+                {
+                    <div class="mb-2">
+                        <small class="text-muted">Selected (@secondaryMoods.Length/2): @string.Join(", ", secondaryMoods)</small>
+                    </div>
+                }
+
+                @if (secondaryMoods.Length > 2)
+                {
+                    <small class="text-danger d-block mb-2">
+                        You can select only 2 secondary moods
+                    </small>
+                }
+            }
+
+            <!-- TAGS -->
+            <label class="form-label">Tags</label>
+
+            <div class="mb-2">
+                @foreach (var tag in PredefinedTags)
+                {
+                    <button type="button"
+                            class="btn btn-outline-secondary btn-sm me-1 mb-1"
+                            @onclick="() => AddTag(tag)">
+                        @tag
+                    </button>
+                }
+            </div>
+
+            <input class="form-control mb-2"
+                   placeholder="Custom tags (type and press Enter)"
+                   @bind="customTagInput"
+                   @onkeydown="OnCustomTagEnter" />
+
+            @if (selectedTags.Any())
+            {
+                <div class="mb-3">
+                    @foreach (var tag in selectedTags)
+                    {
+                        <span class="badge bg-primary me-1 mb-1">
+                            @tag
+                            <button type="button"
+                                    class="btn-close btn-close-white ms-1"
+                                    style="font-size: 0.6rem;"
+                                    @onclick="() => RemoveTag(tag)">
+                            </button>
+                        </span>
+                    }
+                </div>
+            }
 
             @if (!string.IsNullOrEmpty(error))
             {
                 <div class="alert alert-danger">@error</div>
             }
 
-            <button class="btn btn-success"
-                    @onclick="Save">
-                Update Journal
+            <button class="btn btn-success" @onclick="Save">
+                Save Journal
             </button>
 
         </div>
     </div>
-
 </div>
 
 @code {
-
-    [Parameter]
-    public DateTime? date { get; set; }
+    [Parameter] public DateTime? date { get; set; }
 
     string title = "";
-    string content = "";
     string primaryMood = "";
-    string secondaryMoods = "";
-    string tags = "";
+    string[] secondaryMoods = Array.Empty<string>();
+    string customTagInput = "";
     string error = "";
+    string EditorId = $"quill-editor-{Guid.NewGuid()}";
+    string initialContent = "";
+    bool isQuillInitialized = false;
+
+    Dictionary<string, List<string>> MoodCategories = new()
+    {
+        { "Positive", new() { "Happy", "Excited", "Relaxed", "Grateful", "Confident" } },
+        { "Neutral", new() { "Calm", "Thoughtful", "Curious", "Nostalgic", "Bored" } },
+        { "Negative", new() { "Sad", "Angry", "Stressed", "Lonely", "Anxious" } }
+    };
+
+    List<string> PredefinedTags = new()
+    {
+        "Work", "Studies", "Family", "Health", "Fitness",
+        "Travel", "Finance", "Projects", "Reflection",
+        "Music", "Reading", "Writing", "Meditation"
+    };
+
+    List<string> selectedTags = new();
+
+    void OnPrimaryMoodChanged()
+    {
+        secondaryMoods = Array.Empty<string>();
+    }
+
+    void ToggleSecondaryMood(string mood, ChangeEventArgs e)
+    {
+        var isChecked = (bool)(e.Value ?? false);
+        var moodList = secondaryMoods.ToList();
+
+        if (isChecked)
+        {
+            if (moodList.Count < 2 && !moodList.Contains(mood))
+            {
+                moodList.Add(mood);
+            }
+        }
+        else
+        {
+            moodList.Remove(mood);
+        }
+
+        secondaryMoods = moodList.ToArray();
+    }
 
     protected override async Task OnInitializedAsync()
     {
         if (date != null)
         {
-            var journal =
-                await JournalService.GetJournalByDateAsync(
-                    Session.CurrentUser!.UserId,
-                    date.Value);
+            var journal = await JournalService.GetJournalByDateAsync(
+                Session.CurrentUser!.UserId,
+                date.Value);
 
             if (journal != null)
             {
                 title = journal.Title;
-                content = journal.Content;
                 primaryMood = journal.PrimaryMood;
-                secondaryMoods = string.Join(", ", journal.SecondaryMoods);
-                tags = string.Join(", ", journal.Tags);
+                secondaryMoods = (journal.SecondaryMoods ?? new()).ToArray();
+                selectedTags = journal.Tags ?? new();
+                initialContent = journal.Content ?? "";
             }
         }
     }
 
-    private async Task Save()
+    protected override async Task OnAfterRenderAsync(bool firstRender)
     {
-        if (string.IsNullOrWhiteSpace(title) ||
-            string.IsNullOrWhiteSpace(content))
+        if (firstRender)
+        {
+            try
+            {
+                // Initialize Quill
+                await JS.InvokeVoidAsync("initQuill", EditorId);
+                isQuillInitialized = true;
+
+                // Wait a bit to ensure Quill is fully ready
+                await Task.Delay(100);
+
+                // Set content if available
+                if (!string.IsNullOrEmpty(initialContent))
+                {
+                    await JS.InvokeVoidAsync("setQuillHtml", EditorId, initialContent);
+                }
+            }
+            catch (Exception ex)
+            {
+                Console.WriteLine($"Error initializing Quill: {ex.Message}");
+                error = "Error loading editor. Please refresh the page.";
+                StateHasChanged();
+            }
+        }
+    }
+
+    void AddTag(string tag)
+    {
+        if (!selectedTags.Contains(tag))
+            selectedTags.Add(tag);
+    }
+
+    void RemoveTag(string tag)
+    {
+        selectedTags.Remove(tag);
+    }
+
+    void OnCustomTagEnter(KeyboardEventArgs e)
+    {
+        if (e.Key == "Enter" && !string.IsNullOrWhiteSpace(customTagInput))
+        {
+            var tag = customTagInput.Trim();
+            if (!selectedTags.Contains(tag))
+                selectedTags.Add(tag);
+
+            customTagInput = "";
+        }
+    }
+
+    async Task Save()
+    {
+        if (secondaryMoods.Length > 2)
+        {
+            error = "Only 2 secondary moods allowed.";
+            return;
+        }
+
+        var content = await JS.InvokeAsync<string>("getQuillHtml", EditorId);
+
+        if (string.IsNullOrWhiteSpace(title) || string.IsNullOrWhiteSpace(content))
         {
             error = "Title and content are required.";
             return;
@@ -95,17 +275,19 @@
             Title = title,
             Content = content,
             PrimaryMood = primaryMood,
-            SecondaryMoods = secondaryMoods
-                .Split(',', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries)
-                .ToList(),
-            Tags = tags
-                .Split(',', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries)
-                .ToList()
+            SecondaryMoods = secondaryMoods.ToList(),
+            Tags = selectedTags
         };
 
         await JournalService.AddOrUpdateJournalAsync(
-            Session.CurrentUser!.UserId, model);
+            Session.CurrentUser!.UserId,
+            model);
 
-        Nav.NavigateTo("/journal");
+        Nav.NavigateTo("/journals");
+    }
+
+    private void GoBack()
+    {
+        Nav.NavigateTo("/journals");
     }
 }
