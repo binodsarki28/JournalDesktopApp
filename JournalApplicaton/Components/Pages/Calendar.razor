@@ -1,0 +1,197 @@
+﻿@page "/calendar"
+@layout MainLayout
+@using JournalApplicaton.Model
+@using JournalApplicaton.Services
+@inject UserSessionService Session
+@inject NavigationManager Navigation
+@inject IJournalService JournalService
+
+<div class="container py-4 calendar-page">
+    @if (!Session.IsLoggedIn)
+    {
+        <div class="text-center py-5">
+            <h2>Welcome to the Journal Entry App</h2>
+            <p class="text-muted">
+                Capture your daily thoughts, moods, and tags.
+            </p>
+            <a class="btn btn-primary me-2" href="/login">Login</a>
+            <a class="btn btn-outline-primary" href="/register">Register</a>
+        </div>
+    }
+    else
+    {
+        <!-- CALENDAR NAV -->
+        <div class="d-flex justify-content-between align-items-center mb-3">
+            <button class="btn btn-outline-primary" @onclick="PrevMonth">&lt; Prev</button>
+            <h4 class="fw-semibold">@currentMonth.ToString("MMMM yyyy")</h4>
+            <button class="btn btn-outline-primary" @onclick="NextMonth">Next &gt;</button>
+        </div>
+
+        <!-- CALENDAR -->
+        <table class="table table-bordered text-center calendar-table">
+            <thead class="table-light">
+                <tr>
+                    @foreach (var day in Enum.GetValues<DayOfWeek>())
+                    {
+                        <th class="@((day == DayOfWeek.Saturday || day == DayOfWeek.Sunday) ? "text-danger" : "")">
+                            @day.ToString().Substring(0, 3)
+                        </th>
+                    }
+                </tr>
+            </thead>
+            <tbody>
+                @for (int r = 0; r < 6; r++)
+                {
+                    <tr>
+                        @for (int c = 0; c < 7; c++)
+                        {
+                            int cellIndex = r * 7 + c;
+                            var firstDay = new DateTime(currentMonth.Year, currentMonth.Month, 1);
+                            int blanks = (int)firstDay.DayOfWeek;
+                            int daysInMonth = DateTime.DaysInMonth(currentMonth.Year, currentMonth.Month);
+                            int dayCounter = cellIndex - blanks + 1;
+
+                            if (cellIndex < blanks || dayCounter > daysInMonth)
+                            {
+                                <td></td>
+                            }
+                            else
+                            {
+                                var date = new DateTime(currentMonth.Year, currentMonth.Month, dayCounter);
+                                bool isToday = date == DateTime.Today;
+                                bool isFuture = date > DateTime.Today;
+                                bool hasJournal = dateHasJournal.ContainsKey(date) && dateHasJournal[date];
+
+                                <td class="calendar-cell @(isToday ? "today" : "") @(hasJournal ? "has-journal" : "") @(isFuture ? "future" : "")"
+                                    @onclick="@(isFuture ? null : (() => SelectDate(date)))">
+
+                                    <div class="day-number">
+                                        @dayCounter
+                                    </div>
+
+                                    @if (hasJournal)
+                                    {
+                                        <span class="checkmark">✔</span>
+                                    }
+
+                                    @if (!dateHasJournal.ContainsKey(date))
+                                    {
+                                        _ = CheckDateHasJournal(date);
+                                    }
+                                </td>
+                            }
+                        }
+                    </tr>
+                }
+            </tbody>
+        </table>
+    }
+</div>
+
+@code {
+    private DateTime currentMonth = DateTime.Today;
+    private DateTime selectedDate;
+
+    private string journalTitle = "";
+    private string journalContent = "";
+    private string journalPrimaryMood = "";
+
+    private List<string> journalSecondaryMoods = new();
+    private List<string> journalTags = new();
+
+    private string secondaryMoodInput = "";
+    private string tagsInput = "";
+
+    private string formMessage = "";
+    private string formMessageType = "danger";
+
+    private Dictionary<DateTime, bool> dateHasJournal = new();
+
+    private void Logout()
+    {
+        Session.Logout();
+        Navigation.NavigateTo("/login", true);
+    }
+
+    private void PrevMonth() => currentMonth = currentMonth.AddMonths(-1);
+    private void NextMonth() => currentMonth = currentMonth.AddMonths(1);
+
+    private async Task CheckDateHasJournal(DateTime date)
+    {
+        var journal = await JournalService.GetJournalByDateAsync(Session.CurrentUser!.UserId, date);
+        dateHasJournal[date] = journal != null;
+        StateHasChanged();
+    }
+
+    // 🔑 ONLY behavior change: navigate based on journal existence
+    private async void SelectDate(DateTime date)
+    {
+        selectedDate = date;
+
+        var journal = await JournalService.GetJournalByDateAsync(
+            Session.CurrentUser!.UserId,
+            date
+        );
+
+        if (journal == null)
+        {
+            // Create journal
+            Navigation.NavigateTo($"/journal/edit/{date:yyyy-MM-dd}");
+        }
+        else
+        {
+            // View journal
+            Navigation.NavigateTo($"/journal/view/{date:yyyy-MM-dd}");
+        }
+    }
+}
+
+<style>
+    .calendar-page {
+        max-width: 900px;
+    }
+
+    .calendar-table th {
+        font-weight: 600;
+    }
+
+    .calendar-cell {
+        height: 80px;
+        cursor: pointer;
+        position: relative;
+        transition: background 0.2s ease;
+    }
+
+        .calendar-cell:hover {
+            background-color: #f1f5f9;
+        }
+
+        .calendar-cell.future {
+            cursor: not-allowed;
+            opacity: 0.4;
+        }
+
+        .calendar-cell.today .day-number {
+            background: #6b5b95;
+            color: white;
+            border-radius: 50%;
+            padding: 4px 10px;
+            display: inline-block;
+        }
+
+        .calendar-cell.has-journal {
+            background-color: #f8fafc;
+        }
+
+    .day-number {
+        font-weight: 500;
+    }
+
+    .checkmark {
+        position: absolute;
+        top: 6px;
+        right: 8px;
+        color: #16a34a;
+        font-size: 14px;
+    }
+</style>

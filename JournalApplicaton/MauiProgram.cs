@@ -26,6 +26,8 @@ namespace JournalApplicaton
             builder.Services.AddScoped<IJournalService, JournalService>();
             builder.Services.AddDbContext<AppDbContext>();
             builder.Services.AddSingleton<UserSessionService>();
+            builder.Services.AddSingleton<ThemeService>();
+
 
             QuestPDF.Settings.License = QuestPDF.Infrastructure.LicenseType.Community;
 

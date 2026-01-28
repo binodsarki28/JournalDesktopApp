@@ -1,12 +1,12 @@
 ﻿using JournalApplicaton.Common;
+using JournalApplicaton.Data;
 using JournalApplicaton.Entities;
 using JournalApplicaton.Model;
-using JournalApplicaton.Data;
 using Microsoft.EntityFrameworkCore;
-
 using QuestPDF.Fluent;
 using QuestPDF.Helpers;
-using QuestPDF.Infrastructure;
+using System.Text.RegularExpressions;
+using Colors = QuestPDF.Helpers.Colors;
 
 namespace JournalApplicaton.Services;
 
@@ -242,25 +242,37 @@ public class JournalService : IJournalService
     }
 
     public async Task<(List<JournalDisplayModel>, int)>
-        SearchJournalsAsync(
-            int userId,
-            string searchText,
-            DateTime? fromDate,
-            DateTime? toDate,
-            int page,
-            int pageSize)
+     SearchJournalsAsync(
+         int userId,
+         string title,
+         string mood,
+         string tag,
+         DateTime? fromDate,
+         DateTime? toDate,
+         int page,
+         int pageSize)
     {
         var query = _context.Journals
             .Where(j => j.UserId == userId);
 
-        // 🔍 TEXT SEARCH
-        if (!string.IsNullOrWhiteSpace(searchText))
-        {
+        title = title?.ToLower() ?? "";
+        mood = mood?.ToLower() ?? "";
+        tag = tag?.ToLower() ?? "";
+
+        // 🔍 TITLE
+        if (!string.IsNullOrWhiteSpace(title))
             query = query.Where(j =>
-                j.Title.Contains(searchText) ||
-                j.PrimaryMood.Contains(searchText) ||
-                j.Tags.Any(t => t.Contains(searchText)));
-        }
+                j.Title.ToLower().Contains(title));
+
+        // 😊 MOOD
+        if (!string.IsNullOrWhiteSpace(mood))
+            query = query.Where(j =>
+                j.PrimaryMood.ToLower() == mood);
+
+        // 🏷️ TAG
+        if (!string.IsNullOrWhiteSpace(tag))
+            query = query.Where(j =>
+                j.Tags.Any(t => t.ToLower().Contains(tag)));
 
         // 📅 DATE FILTER
         if (fromDate.HasValue)
@@ -291,6 +303,7 @@ public class JournalService : IJournalService
         return (journals, totalCount);
     }
 
+
     public async Task<byte[]> GenerateJournalPdfAsync(
     int userId,
     DateTime fromDate,
@@ -309,41 +322,87 @@ public class JournalService : IJournalService
             container.Page(page =>
             {
                 page.Size(PageSizes.A4);
-                page.Margin(30);
+                page.Margin(40);
                 page.DefaultTextStyle(x => x.FontSize(11));
 
-                page.Header()
-                    .Text($"Journal Report ({fromDate:dd MMM yyyy} - {toDate:dd MMM yyyy})")
-                    .SemiBold().FontSize(16).AlignCenter();
+                // ===== HEADER =====
+                page.Header().Column(h =>
+                {
+                    h.Item().Text("Journal Report")
+                        .SemiBold()
+                        .FontSize(18)
+                        .AlignCenter();
 
-                page.Content().Column(col =>
+                    h.Item().PaddingTop(5).Text(
+                        $"{fromDate:dd MMM yyyy} - {toDate:dd MMM yyyy}")
+                        .AlignCenter()
+                        .FontSize(10)
+                        .FontColor(Colors.Grey.Medium);
+                });
+
+                // ===== CONTENT =====
+                page.Content().PaddingTop(20).Column(col =>
                 {
                     foreach (var j in journals)
                     {
-                        col.Item().PaddingBottom(10).BorderBottom(1).Column(c =>
-                        {
-                            c.Item().Text(j.EntryDate.ToString("dd MMM yyyy"))
-                                .SemiBold().FontSize(12);
+                        col.Item().BorderBottom(1)
+                            .BorderColor(Colors.Grey.Lighten2)
+                            .PaddingBottom(15)
+                            .PaddingTop(10)
+                            .Column(c =>
+                            {
+                                c.Item().Text(j.EntryDate.ToString("dd MMM yyyy"))
+                                    .SemiBold()
+                                    .FontSize(12);
 
-                            c.Item().Text(j.Title).SemiBold();
-                            c.Item().Text($"Mood: {j.PrimaryMood}");
-                            c.Item().Text($"Words: {j.WordCount}");
-                            c.Item().Text(j.Content);
-                        });
+                                c.Item().PaddingTop(3)
+                                    .Text(j.Title)
+                                    .SemiBold()
+                                    .FontSize(13);
+
+                                c.Item().PaddingTop(5).Row(r =>
+                                {
+                                    r.RelativeItem().Text($"Mood: {j.PrimaryMood}");
+                                    r.RelativeItem().AlignRight()
+                                        .Text($"Words: {j.WordCount}");
+                                });
+
+                                c.Item().PaddingTop(8)
+                                    .Text(CleanHtml(j.Content))
+                                    .LineHeight(1.4f);
+                            });
                     }
                 });
 
-                page.Footer()
-                    .AlignCenter()
-                    .Text(x =>
-                    {
-                        x.Span("Generated on ");
-                        x.Span(DateTime.Now.ToString("dd MMM yyyy HH:mm"));
-                    });
+                // ===== FOOTER =====
+                page.Footer().AlignCenter().Text(text =>
+                {
+                    text.Span("Generated on ");
+                    text.Span(DateTime.Now.ToString("dd MMM yyyy HH:mm"))
+                        .SemiBold();
+                });
             });
         });
 
         return document.GeneratePdf();
     }
+
+private string CleanHtml(string html)
+{
+    if (string.IsNullOrWhiteSpace(html))
+        return string.Empty;
+
+    // Convert block tags to line breaks
+    html = Regex.Replace(html, @"<(br|BR)\s*/?>", "\n");
+    html = Regex.Replace(html, @"</p>|</li>|</ul>|</ol>", "\n");
+
+    // Remove all remaining HTML tags
+    html = Regex.Replace(html, "<.*?>", string.Empty);
+
+    // Decode HTML entities
+    html = System.Net.WebUtility.HtmlDecode(html);
+
+    return html.Trim();
+}
 
 }
